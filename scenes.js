@@ -1,601 +1,449 @@
 // ========================================
-// THE BUILDER TRAIL — Scene System (M2.5)
-// Canvas-based scene compositor with character sprites
+// THE BUILDER TRAIL — Tile-Based Pixel Art Scenes
 // ========================================
+// Uses LimeZu "Modern tiles_Free" sprite sheets
+// Tile coords: (col, row) 0-indexed, 16×16px per tile
 
 const TILE_SIZE = 16;
 const SCENE_SCALE = 3;
 
-// --- Character Sprite Loading ---
-const SPRITE_SHEETS = {};
+// ── Sprite Sheet Loading ──
+
+const SPRITE_SHEETS = {
+  interiors: 'assets/Interiors_free_16x16.png',
+  rooms: 'assets/Room_Builder_free_16x16.png'
+};
+
 const sheetImages = {};
-let sheetsLoaded = false;
+const sceneCache = {};
 
 function preloadSheets() {
-  // No tileset sheets needed — scenes use fill rects
-  sheetsLoaded = true;
-  return Promise.resolve();
+  Object.entries(SPRITE_SHEETS).forEach(([key, src]) => {
+    const img = new Image();
+    img.src = src;
+    sheetImages[key] = img;
+  });
 }
 
 function loadCharacterTiles(charName) {
-  const name = charName.toLowerCase();
-  const poses = {
-    idle: `assets/${charName}_idle_16x16.png`,
-    sit: `assets/${charName}_sit2_16x16.png`,
-    phone: `assets/${charName}_phone_16x16.png`,
-  };
-
-  const TILE_ATLAS_ENTRIES = {};
-  Object.entries(poses).forEach(([pose, src]) => {
-    const sheetKey = `char-${name}-${pose}-sheet`;
-    SPRITE_SHEETS[sheetKey] = src;
-    TILE_ATLAS[`char-${name}-${pose}`] = { sheet: sheetKey, col: 0, row: 0, h: 2 };
+  ['idle', 'sit2', 'phone'].forEach(pose => {
+    const img = new Image();
+    img.src = `assets/${charName}_${pose}_16x16.png`;
+    sheetImages['char_' + pose] = img;
   });
-
-  return Promise.all(Object.keys(poses).map(pose => {
-    const sheetKey = `char-${name}-${pose}-sheet`;
-    return new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => { sheetImages[sheetKey] = img; resolve(); };
-      img.onerror = () => resolve();
-      img.src = SPRITE_SHEETS[sheetKey];
-    });
-  }));
+  clearSceneCache();
 }
 
-// --- Tile Atlas (character sprites only) ---
-const TILE_ATLAS = {};
+function clearSceneCache() {
+  for (const k of Object.keys(sceneCache)) delete sceneCache[k];
+}
 
-// --- Scene Definitions ---
-// Layers: { type: 'fill', color, x, y, w, h }
-//         { tile: '__CHARACTER_SIT__' | '__CHARACTER_IDLE__' | '__CHARACTER_PHONE__', x, y }
+// ── Tile Shorthand ──
+// { s: sheetKey, c: col, r: row }
+
+const T = {
+  // Room_Builder — Wall surfaces (paired rows: top has crown, bottom has baseboard)
+  // Col groups 0-1, 4-5, 7-8 are sub-variants; use col 4-5 for clean mid-wall fill
+  WALL_CREAM_T:  { s: 'rooms', c: 4, r: 7 },   // Yellow/cream
+  WALL_CREAM_B:  { s: 'rooms', c: 4, r: 8 },
+  WALL_WHITE_T:  { s: 'rooms', c: 4, r: 17 },  // White/cream flat
+  WALL_WHITE_B:  { s: 'rooms', c: 4, r: 18 },
+  WALL_WARM_T:   { s: 'rooms', c: 4, r: 5 },   // Salmon/coral
+  WALL_WARM_B:   { s: 'rooms', c: 4, r: 6 },
+  WALL_BLUE_T:   { s: 'rooms', c: 4, r: 19 },  // Blue/lavender
+  WALL_BLUE_B:   { s: 'rooms', c: 4, r: 20 },
+  WALL_DARK_T:   { s: 'rooms', c: 4, r: 15 },  // Dark wood panel
+  WALL_DARK_B:   { s: 'rooms', c: 4, r: 16 },
+  WALL_MINT_T:   { s: 'rooms', c: 4, r: 11 },  // Mint/teal
+  WALL_MINT_B:   { s: 'rooms', c: 4, r: 12 },
+  WALL_BEIGE_T:  { s: 'rooms', c: 4, r: 21 },  // Beige/tan
+  WALL_BEIGE_B:  { s: 'rooms', c: 4, r: 22 },
+
+  // Room_Builder — Floors (cols 10-16 area, proper floor tiles)
+  FLOOR_GRAY:    { s: 'rooms', c: 11, r: 11 },  // Gray smooth
+  FLOOR_CREAM:   { s: 'rooms', c: 11, r: 7 },   // Yellow/cream tile
+  FLOOR_BLUE:    { s: 'rooms', c: 11, r: 9 },   // Light blue patterned
+  FLOOR_HERRING: { s: 'rooms', c: 11, r: 13 },  // Orange herringbone
+  FLOOR_STONE:   { s: 'rooms', c: 15, r: 5 },   // Gray stone
+  // Wood-look floors (using mid-col wood panel for cleaner tiling)
+  FLOOR_WOOD:    { s: 'rooms', c: 5, r: 13 },   // Light wood
+  FLOOR_WOOD_D:  { s: 'rooms', c: 5, r: 15 },   // Dark wood
+};
+
+// Character sentinels
+const CHAR_SIT = '__CHARACTER_SIT__';
+const CHAR_IDLE = '__CHARACTER_IDLE__';
+
+// Helper: multi-tile layer entries from a sheet region
+function mt(sheet, sc, sr, w, h, dx, dy) {
+  const out = [];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      out.push({ tile: { s: sheet, c: sc + x, r: sr + y }, x: dx + x, y: dy + y });
+  return out;
+}
+
+// ── Scene Definitions ──
+// Each scene: 16 wide × 12 tall tiles
+// Layers drawn bottom→top: floor fill, wall fill, furniture, character, overlays
 
 const SCENES = {
 
-  // 1. Late night coding session
-  'coding-night': {
-    width: 16, height: 12,
-    caption: '2:47 AM. It works.',
-    bg: '#0a0a14',
-    layers: [
-      // Dark wall
-      { type: 'fill', color: '#161b22', x: 0, y: 0, w: 16, h: 8 },
-      // Wall baseboard
-      { type: 'fill', color: '#21262d', x: 0, y: 7.5, w: 16, h: 0.5 },
-      // Floor
-      { type: 'fill', color: '#1c1510', x: 0, y: 8, w: 16, h: 4 },
-      // Floor line
-      { type: 'fill', color: '#2a2015', x: 0, y: 10, w: 16, h: 0.1 },
-      // Window — night sky
-      { type: 'fill', color: '#0d1117', x: 11, y: 1, w: 3, h: 3 },
-      { type: 'fill', color: '#30363d', x: 10.8, y: 0.8, w: 3.4, h: 0.2 },
-      { type: 'fill', color: '#30363d', x: 10.8, y: 4, w: 3.4, h: 0.2 },
-      { type: 'fill', color: '#30363d', x: 10.8, y: 0.8, w: 0.2, h: 3.4 },
-      { type: 'fill', color: '#30363d', x: 14, y: 0.8, w: 0.2, h: 3.4 },
-      // Stars in window
-      { type: 'fill', color: '#e6edf3', x: 11.5, y: 1.5, w: 0.2, h: 0.2 },
-      { type: 'fill', color: '#e6edf3', x: 13, y: 2.2, w: 0.2, h: 0.2 },
-      { type: 'fill', color: '#8b949e', x: 12.2, y: 3, w: 0.15, h: 0.15 },
-      // Blue glow from window
-      { type: 'fill', color: 'rgba(88,166,255,0.06)', x: 10, y: 0, w: 6, h: 12 },
-      // Desk
-      { type: 'fill', color: '#4a3520', x: 3, y: 8, w: 7, h: 0.5 },
-      { type: 'fill', color: '#3d2c18', x: 3, y: 8.5, w: 0.4, h: 2.5 },
-      { type: 'fill', color: '#3d2c18', x: 9.6, y: 8.5, w: 0.4, h: 2.5 },
-      // Monitor
-      { type: 'fill', color: '#30363d', x: 5, y: 5.5, w: 3, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 5.2, y: 5.7, w: 2.6, h: 1.5 },
-      // Code on screen
-      { type: 'fill', color: '#58a6ff', x: 5.5, y: 6, w: 0.8, h: 0.2 },
-      { type: 'fill', color: '#3fb950', x: 6.5, y: 6, w: 0.5, h: 0.2 },
-      { type: 'fill', color: '#e6edf3', x: 5.7, y: 6.4, w: 1.2, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 5.5, y: 6.7, w: 0.6, h: 0.15 },
-      { type: 'fill', color: '#8b949e', x: 6.3, y: 6.7, w: 0.8, h: 0.15 },
-      // Monitor stand
-      { type: 'fill', color: '#30363d', x: 6.2, y: 7.5, w: 0.6, h: 0.5 },
-      // Monitor glow on desk
-      { type: 'fill', color: 'rgba(88,166,255,0.15)', x: 3, y: 7, w: 7, h: 4 },
-      // Coffee mug
-      { type: 'fill', color: '#8b949e', x: 9, y: 7.5, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#6e4a2a', x: 9.1, y: 7.6, w: 0.3, h: 0.3 },
-      // Character sitting
-      { tile: '__CHARACTER_SIT__', x: 6, y: 7 },
-    ]
-  },
-
-  // 2. Shipped something real
   'ship': {
     width: 16, height: 12,
     caption: '{name} shipped something real.',
-    bg: '#0d1117',
     layers: [
-      // Dark room
-      { type: 'fill', color: '#161b22', x: 0, y: 0, w: 16, h: 8 },
-      { type: 'fill', color: '#21262d', x: 0, y: 7.5, w: 16, h: 0.5 },
-      { type: 'fill', color: '#1c1510', x: 0, y: 8, w: 16, h: 4 },
-      // Desk
-      { type: 'fill', color: '#4a3520', x: 3, y: 8, w: 7, h: 0.5 },
-      { type: 'fill', color: '#3d2c18', x: 3, y: 8.5, w: 0.4, h: 2.5 },
-      { type: 'fill', color: '#3d2c18', x: 9.6, y: 8.5, w: 0.4, h: 2.5 },
-      // Monitor with GREEN deploy screen
-      { type: 'fill', color: '#30363d', x: 5, y: 5.5, w: 3, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 5.2, y: 5.7, w: 2.6, h: 1.5 },
-      { type: 'fill', color: '#3fb950', x: 5.8, y: 6.1, w: 1.4, h: 0.4 },
-      { type: 'fill', color: '#3fb950', x: 6.1, y: 6.6, w: 0.8, h: 0.2 },
-      { type: 'fill', color: '#30363d', x: 6.2, y: 7.5, w: 0.6, h: 0.5 },
-      // Green glow
-      { type: 'fill', color: 'rgba(63,185,80,0.2)', x: 3, y: 5, w: 7, h: 6 },
-      // Character at desk
-      { tile: '__CHARACTER_SIT__', x: 6, y: 7 },
+      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
+      // Double window on wall
+      ...mt('interiors', 0, 26, 2, 2, 7, 1),
+      // Bookshelf against wall (2×4)
+      ...mt('interiors', 4, 14, 2, 4, 1, 4),
+      // Desk with open book (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 7, 6),
+      // Computer tower
+      ...mt('interiors', 12, 40, 1, 2, 9, 6),
+      // Chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 8, y: 8 },
+      // Large potted plant (2×3)
+      ...mt('interiors', 10, 44, 2, 3, 13, 5),
+      // Character sitting at desk
+      { tile: CHAR_SIT, x: 8, y: 7 },
       // Confetti
-      { type: 'fill', color: '#3fb950', x: 2, y: 1, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#58a6ff', x: 9, y: 0.5, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#f0883e', x: 4, y: 2, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#f85149', x: 12, y: 1, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#d29922', x: 7, y: 0.5, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#3fb950', x: 14, y: 2.5, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#58a6ff', x: 1, y: 3, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#f0883e', x: 11, y: 3.5, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#d29922', x: 3, y: 0.5, w: 0.3, h: 0.3 },
-      { type: 'fill', color: '#f85149', x: 13, y: 0.5, w: 0.3, h: 0.3 },
-      // Plant
-      { type: 'fill', color: '#3d2c18', x: 13.5, y: 9.5, w: 0.8, h: 0.8 },
-      { type: 'fill', color: '#3fb950', x: 13.3, y: 8.5, w: 0.5, h: 1.2 },
-      { type: 'fill', color: '#2ea043', x: 13.8, y: 8.8, w: 0.5, h: 0.9 },
-      { type: 'fill', color: '#3fb950', x: 14.1, y: 9, w: 0.3, h: 0.6 },
+      { type: 'fill', color: '#3fb950', x: 3, y: 1, w: 1, h: 1 },
+      { type: 'fill', color: '#f0883e', x: 12, y: 0, w: 1, h: 1 },
+      { type: 'fill', color: '#58a6ff', x: 10, y: 2, w: 1, h: 1 },
+      { type: 'fill', color: '#f0883e', x: 5, y: 0, w: 1, h: 1 },
+      { type: 'fill', color: '#3fb950', x: 14, y: 3, w: 1, h: 1 },
     ]
   },
 
-  // 3. Family time
-  'family': {
-    width: 16, height: 12,
-    caption: 'Some things matter more than code.',
-    bg: '#1a150e',
-    layers: [
-      // Warm walls
-      { type: 'fill', color: '#2a2015', x: 0, y: 0, w: 16, h: 8 },
-      { type: 'fill', color: '#332818', x: 0, y: 7.5, w: 16, h: 0.5 },
-      // Warm wood floor
-      { type: 'fill', color: '#3d2c18', x: 0, y: 8, w: 16, h: 4 },
-      { type: 'fill', color: '#4a3520', x: 0, y: 10, w: 16, h: 0.1 },
-      // Floor lamp with warm glow
-      { type: 'fill', color: '#d29922', x: 13.2, y: 4.5, w: 0.8, h: 0.6 },
-      { type: 'fill', color: '#8b949e', x: 13.5, y: 5.1, w: 0.2, h: 3.5 },
-      { type: 'fill', color: 'rgba(210,153,34,0.15)', x: 10, y: 0, w: 6, h: 12 },
-      // Bookshelf on left
-      { type: 'fill', color: '#4a3520', x: 0, y: 3, w: 2, h: 5 },
-      { type: 'fill', color: '#3d2c18', x: 0.2, y: 3.2, w: 1.6, h: 0.2 },
-      { type: 'fill', color: '#3d2c18', x: 0.2, y: 4.5, w: 1.6, h: 0.2 },
-      { type: 'fill', color: '#3d2c18', x: 0.2, y: 5.8, w: 1.6, h: 0.2 },
-      // Books (colored spines)
-      { type: 'fill', color: '#58a6ff', x: 0.3, y: 3.5, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#f85149', x: 0.7, y: 3.5, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#3fb950', x: 1.1, y: 3.5, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#d29922', x: 1.5, y: 3.5, w: 0.2, h: 0.9 },
-      { type: 'fill', color: '#f0883e', x: 0.3, y: 4.8, w: 0.4, h: 0.9 },
-      { type: 'fill', color: '#8b949e', x: 0.8, y: 4.8, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#58a6ff', x: 1.2, y: 4.8, w: 0.3, h: 0.9 },
-      // Sofa
-      { type: 'fill', color: '#4a3520', x: 5, y: 8, w: 5, h: 2 },
-      { type: 'fill', color: '#5a422a', x: 5.2, y: 8.2, w: 4.6, h: 1.5 },
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 7, w: 0.4, h: 3 },
-      { type: 'fill', color: '#4a3520', x: 9.8, y: 7, w: 0.4, h: 3 },
-      // Rug
-      { type: 'fill', color: '#6e4a2a', x: 4, y: 10, w: 7, h: 1.5 },
-      { type: 'fill', color: '#5a422a', x: 4.3, y: 10.2, w: 6.4, h: 1.1 },
-      // Character sitting on sofa
-      { tile: '__CHARACTER_SIT__', x: 7, y: 7 },
-    ]
-  },
-
-  // 4. Burnout
   'burnout': {
     width: 16, height: 12,
     caption: '{name} pushed too hard.',
-    bg: '#050508',
     layers: [
-      // Very dark walls
-      { type: 'fill', color: '#0a0a0f', x: 0, y: 0, w: 16, h: 8 },
-      // Dark floor
-      { type: 'fill', color: '#080810', x: 0, y: 8, w: 16, h: 4 },
+      { type: 'tile-fill', tile: T.FLOOR_WOOD_D, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_DARK_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_DARK_B, x: 0, y: 2, w: 16, h: 2 },
       // Desk
-      { type: 'fill', color: '#2a2015', x: 3, y: 8, w: 7, h: 0.5 },
-      { type: 'fill', color: '#1c1510', x: 3, y: 8.5, w: 0.4, h: 2.5 },
-      { type: 'fill', color: '#1c1510', x: 9.6, y: 8.5, w: 0.4, h: 2.5 },
-      // Monitor with red error
-      { type: 'fill', color: '#21262d', x: 5, y: 5.5, w: 3, h: 2 },
-      { type: 'fill', color: '#160b0b', x: 5.2, y: 5.7, w: 2.6, h: 1.5 },
-      { type: 'fill', color: '#f85149', x: 6, y: 6.2, w: 0.4, h: 0.3 },
-      { type: 'fill', color: '#f85149', x: 6.6, y: 6.2, w: 0.4, h: 0.3 },
-      { type: 'fill', color: '#21262d', x: 6.2, y: 7.5, w: 0.6, h: 0.5 },
-      // Red glow
-      { type: 'fill', color: 'rgba(248,81,73,0.1)', x: 3, y: 4, w: 7, h: 7 },
-      // Multiple coffee cups scattered
-      { type: 'fill', color: '#484848', x: 3.5, y: 7.5, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#484848', x: 8.5, y: 7.6, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#484848', x: 9.2, y: 7.3, w: 0.4, h: 0.4 },
-      // Crumpled papers on floor
-      { type: 'fill', color: '#21262d', x: 2, y: 9.5, w: 0.6, h: 0.4 },
-      { type: 'fill', color: '#21262d', x: 11, y: 10, w: 0.5, h: 0.4 },
+      ...mt('interiors', 5, 36, 2, 2, 6, 6),
+      // Chalkboard as dim monitor (2×2)
+      ...mt('interiors', 10, 40, 2, 2, 7, 4),
+      // Chair
+      { tile: { s: 'interiors', c: 4, r: 32 }, x: 7, y: 8 },
       // Character slumped at desk
-      { tile: '__CHARACTER_SIT__', x: 6, y: 7 },
+      { tile: CHAR_SIT, x: 7, y: 7 },
+      // Dark overlay
+      { type: 'fill', color: 'rgba(0,0,0,0.35)', x: 0, y: 0, w: 16, h: 12 },
+      // Dim red glow from screen
+      { type: 'fill', color: 'rgba(248,81,73,0.15)', x: 5, y: 4, w: 6, h: 5 },
     ]
   },
 
-  // 5. Flow state
+  'family': {
+    width: 16, height: 12,
+    caption: 'Some things matter more than code.',
+    layers: [
+      { type: 'tile-fill', tile: T.FLOOR_HERRING, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
+      // Landscape painting
+      ...mt('interiors', 0, 13, 2, 1, 3, 2),
+      // Large red/gold rug (4×4)
+      ...mt('interiors', 6, 15, 4, 4, 5, 7),
+      // Brown couch (3×2)
+      ...mt('interiors', 6, 13, 3, 2, 6, 5),
+      // Coffee table
+      { tile: { s: 'interiors', c: 5, r: 13 }, x: 7, y: 7 },
+      // Standing lamp (1×2)
+      ...mt('interiors', 11, 52, 1, 2, 1, 5),
+      // Large potted plant (2×3)
+      ...mt('interiors', 10, 44, 2, 3, 13, 4),
+      // Character standing
+      { tile: CHAR_IDLE, x: 10, y: 7 },
+    ]
+  },
+
+  'late-night': {
+    width: 16, height: 12,
+    caption: '2:47 AM. It works.',
+    layers: [
+      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_BLUE_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_BLUE_B, x: 0, y: 2, w: 16, h: 2 },
+      // Night sky behind window
+      { type: 'fill', color: '#0a0a2e', x: 11, y: 1, w: 4, h: 2 },
+      // Wide window (4×2)
+      ...mt('interiors', 0, 28, 4, 2, 11, 1),
+      // Moon
+      { type: 'fill', color: '#e6edf3', x: 13, y: 1, w: 1, h: 1 },
+      // Desk with book (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 5, 6),
+      // Computer tower
+      ...mt('interiors', 12, 40, 1, 2, 7, 6),
+      // Chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 6, y: 8 },
+      // Character sitting
+      { tile: CHAR_SIT, x: 6, y: 7 },
+      // Dark overlay
+      { type: 'fill', color: 'rgba(0,0,20,0.4)', x: 0, y: 0, w: 16, h: 12 },
+      // Monitor glow
+      { type: 'fill', color: 'rgba(88,166,255,0.2)', x: 4, y: 5, w: 5, h: 4 },
+    ]
+  },
+
   'flow-state': {
     width: 16, height: 12,
     caption: 'Everything clicks.',
-    bg: '#0d1117',
     layers: [
-      // Clean walls
-      { type: 'fill', color: '#161b22', x: 0, y: 0, w: 16, h: 8 },
-      { type: 'fill', color: '#21262d', x: 0, y: 7.5, w: 16, h: 0.5 },
-      // Light floor
-      { type: 'fill', color: '#1c1c1c', x: 0, y: 8, w: 16, h: 4 },
-      // Large desk
-      { type: 'fill', color: '#4a3520', x: 1, y: 8, w: 12, h: 0.5 },
-      { type: 'fill', color: '#3d2c18', x: 1, y: 8.5, w: 0.4, h: 2.5 },
-      { type: 'fill', color: '#3d2c18', x: 12.6, y: 8.5, w: 0.4, h: 2.5 },
-      // Left monitor (green code)
-      { type: 'fill', color: '#30363d', x: 2, y: 5.5, w: 3, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 2.2, y: 5.7, w: 2.6, h: 1.5 },
-      { type: 'fill', color: '#3fb950', x: 2.5, y: 6, w: 0.8, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 2.5, y: 6.3, w: 1.2, h: 0.1 },
-      { type: 'fill', color: '#3fb950', x: 2.5, y: 6.5, w: 0.6, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 2.5, y: 6.7, w: 1, h: 0.1 },
-      { type: 'fill', color: '#30363d', x: 3.2, y: 7.5, w: 0.6, h: 0.5 },
-      // Right monitor (blue UI)
-      { type: 'fill', color: '#30363d', x: 9, y: 5.5, w: 3, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 9.2, y: 5.7, w: 2.6, h: 1.5 },
-      { type: 'fill', color: '#58a6ff', x: 9.5, y: 6, w: 1.8, h: 0.3 },
-      { type: 'fill', color: '#21262d', x: 9.5, y: 6.5, w: 0.8, h: 0.6 },
-      { type: 'fill', color: '#21262d', x: 10.5, y: 6.5, w: 0.8, h: 0.6 },
-      { type: 'fill', color: '#30363d', x: 10.2, y: 7.5, w: 0.6, h: 0.5 },
-      // Plant between monitors
-      { type: 'fill', color: '#3d2c18', x: 6.8, y: 7, w: 0.6, h: 1 },
-      { type: 'fill', color: '#3fb950', x: 6.3, y: 5.5, w: 0.6, h: 1.8 },
-      { type: 'fill', color: '#2ea043', x: 6.9, y: 5.8, w: 0.6, h: 1.5 },
-      { type: 'fill', color: '#3fb950', x: 7.3, y: 6.2, w: 0.4, h: 1 },
-      // Ambient dual glow
-      { type: 'fill', color: 'rgba(63,185,80,0.08)', x: 0, y: 4, w: 8, h: 7 },
-      { type: 'fill', color: 'rgba(88,166,255,0.08)', x: 8, y: 4, w: 8, h: 7 },
-      // Character sitting
-      { tile: '__CHARACTER_SIT__', x: 6, y: 7 },
+      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
+      // Bulletin board on wall
+      ...mt('interiors', 0, 41, 2, 1, 7, 2),
+      // Calendar/schedule board
+      ...mt('interiors', 14, 38, 2, 2, 11, 1),
+      // Left desk (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 2, 6),
+      // Left computer tower
+      ...mt('interiors', 12, 40, 1, 2, 4, 6),
+      // Right desk (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 10, 6),
+      // Right computer tower
+      ...mt('interiors', 12, 40, 1, 2, 12, 6),
+      // Left chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 3, y: 8 },
+      // Right chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 11, y: 8 },
+      // Large plant between desks (2×3)
+      ...mt('interiors', 10, 44, 2, 3, 7, 5),
+      // Character at right desk
+      { tile: CHAR_SIT, x: 11, y: 7 },
+      // Subtle green glow
+      { type: 'fill', color: 'rgba(63,185,80,0.08)', x: 0, y: 0, w: 16, h: 12 },
     ]
   },
 
-  // 6. Coffee shop coding
   'coffee-shop': {
     width: 16, height: 12,
     caption: 'The perfect Saturday morning.',
-    bg: '#2a1f14',
     layers: [
-      // Warm walls
-      { type: 'fill', color: '#332818', x: 0, y: 0, w: 16, h: 7 },
-      { type: 'fill', color: '#3d2c18', x: 0, y: 6.5, w: 16, h: 0.5 },
-      // Floor
-      { type: 'fill', color: '#4a3520', x: 0, y: 7, w: 16, h: 5 },
-      { type: 'fill', color: '#3d2c18', x: 0, y: 9, w: 16, h: 0.1 },
-      // Large window with daylight
-      { type: 'fill', color: '#87ceeb', x: 5, y: 1, w: 6, h: 4 },
-      { type: 'fill', color: '#b8e6f0', x: 5.5, y: 1.5, w: 5, h: 3 },
-      // Window frame
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 0.8, w: 6.4, h: 0.2 },
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 5, w: 6.4, h: 0.2 },
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 0.8, w: 0.2, h: 4.4 },
-      { type: 'fill', color: '#4a3520', x: 11, y: 0.8, w: 0.2, h: 4.4 },
-      { type: 'fill', color: '#4a3520', x: 7.9, y: 0.8, w: 0.2, h: 4.4 },
-      // Sunlight spill
-      { type: 'fill', color: 'rgba(240,230,140,0.1)', x: 4, y: 0, w: 8, h: 12 },
-      // Counter/bar
-      { type: 'fill', color: '#4a3520', x: 2, y: 8, w: 8, h: 0.5 },
-      { type: 'fill', color: '#3d2c18', x: 2, y: 8.5, w: 0.4, h: 2 },
-      { type: 'fill', color: '#3d2c18', x: 9.6, y: 8.5, w: 0.4, h: 2 },
-      // Laptop on counter
-      { type: 'fill', color: '#30363d', x: 5.5, y: 7.2, w: 1.5, h: 0.8 },
-      { type: 'fill', color: '#0d1117', x: 5.6, y: 7.3, w: 1.3, h: 0.5 },
-      { type: 'fill', color: '#58a6ff', x: 5.8, y: 7.4, w: 0.4, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 6.3, y: 7.4, w: 0.3, h: 0.15 },
-      // Coffee mug
-      { type: 'fill', color: '#e6edf3', x: 8, y: 7.4, w: 0.5, h: 0.5 },
-      { type: 'fill', color: '#6e4a2a', x: 8.1, y: 7.5, w: 0.3, h: 0.3 },
-      // Pendant lights
-      { type: 'fill', color: '#d29922', x: 3, y: 0, w: 0.5, h: 0.8 },
-      { type: 'fill', color: 'rgba(210,153,34,0.1)', x: 2, y: 0, w: 2.5, h: 4 },
-      { type: 'fill', color: '#d29922', x: 11.5, y: 0, w: 0.5, h: 0.8 },
-      { type: 'fill', color: 'rgba(210,153,34,0.1)', x: 10.5, y: 0, w: 2.5, h: 4 },
-      // Small plants on shelf
-      { type: 'fill', color: '#3d2c18', x: 1, y: 5.5, w: 0.6, h: 0.5 },
-      { type: 'fill', color: '#3fb950', x: 0.8, y: 4.8, w: 0.5, h: 0.8 },
-      { type: 'fill', color: '#2ea043', x: 1.2, y: 5, w: 0.4, h: 0.6 },
-      { type: 'fill', color: '#3d2c18', x: 14, y: 5.5, w: 0.6, h: 0.5 },
-      { type: 'fill', color: '#3fb950', x: 13.8, y: 4.8, w: 0.5, h: 0.8 },
-      { type: 'fill', color: '#2ea043', x: 14.2, y: 5, w: 0.4, h: 0.6 },
-      // Character sitting at counter
-      { tile: '__CHARACTER_SIT__', x: 7, y: 8 },
+      { type: 'tile-fill', tile: T.FLOOR_CREAM, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_WARM_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_WARM_B, x: 0, y: 2, w: 16, h: 2 },
+      // Large window
+      ...mt('interiors', 0, 28, 4, 2, 1, 1),
+      // Cafe counter (2×2)
+      ...mt('interiors', 0, 55, 2, 2, 12, 4),
+      // Wood table (3×2)
+      ...mt('interiors', 0, 10, 3, 2, 5, 6),
+      // Chairs at table
+      { tile: { s: 'interiors', c: 3, r: 31 }, x: 5, y: 8 },
+      { tile: { s: 'interiors', c: 4, r: 31 }, x: 7, y: 8 },
+      // Small potted plant
+      { tile: { s: 'interiors', c: 0, r: 49 }, x: 14, y: 7 },
+      // Another table (back of shop)
+      ...mt('interiors', 0, 10, 3, 2, 9, 8),
+      // Character sitting at main table
+      { tile: CHAR_SIT, x: 6, y: 7 },
+      // Warm cafe glow
+      { type: 'fill', color: 'rgba(210,153,34,0.06)', x: 0, y: 0, w: 16, h: 12 },
     ]
   },
 
-  // 7. Day job office
-  'office': {
+  'vacation': {
     width: 16, height: 12,
-    caption: 'Back to the day job.',
-    bg: '#181c24',
+    caption: 'No laptops allowed.',
     layers: [
-      // Office walls
-      { type: 'fill', color: '#e6edf3', x: 0, y: 0, w: 16, h: 7 },
-      { type: 'fill', color: '#d0d7de', x: 0, y: 6.5, w: 16, h: 0.5 },
-      // Carpet floor
-      { type: 'fill', color: '#8b949e', x: 0, y: 7, w: 16, h: 5 },
-      { type: 'fill', color: '#6e7681', x: 0, y: 9, w: 16, h: 0.1 },
-      // Corporate desk
-      { type: 'fill', color: '#c9d1d9', x: 4, y: 8, w: 5, h: 0.5 },
-      { type: 'fill', color: '#8b949e', x: 4, y: 8.5, w: 0.4, h: 2 },
-      { type: 'fill', color: '#8b949e', x: 8.6, y: 8.5, w: 0.4, h: 2 },
-      // Monitor
-      { type: 'fill', color: '#30363d', x: 5.5, y: 5.5, w: 2.5, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 5.7, y: 5.7, w: 2.1, h: 1.5 },
-      // Spreadsheet on screen
-      { type: 'fill', color: '#58a6ff', x: 5.9, y: 5.9, w: 1.7, h: 0.2 },
-      { type: 'fill', color: '#e6edf3', x: 5.9, y: 6.2, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 6.5, y: 6.2, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 7.1, y: 6.2, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 5.9, y: 6.5, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 6.5, y: 6.5, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#e6edf3', x: 7.1, y: 6.5, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#30363d', x: 6.5, y: 7.5, w: 0.5, h: 0.5 },
-      // Whiteboard
-      { type: 'fill', color: '#ffffff', x: 10, y: 1.5, w: 4, h: 3 },
-      { type: 'fill', color: '#d0d7de', x: 10, y: 1.5, w: 4, h: 0.15 },
-      { type: 'fill', color: '#d0d7de', x: 10, y: 4.35, w: 4, h: 0.15 },
-      { type: 'fill', color: '#d0d7de', x: 10, y: 1.5, w: 0.15, h: 3 },
-      { type: 'fill', color: '#d0d7de', x: 13.85, y: 1.5, w: 0.15, h: 3 },
-      // Sticky notes on whiteboard
-      { type: 'fill', color: '#58a6ff', x: 10.5, y: 2, w: 1, h: 0.8 },
-      { type: 'fill', color: '#3fb950', x: 11.8, y: 2, w: 1, h: 0.8 },
-      { type: 'fill', color: '#f0883e', x: 10.5, y: 3.2, w: 1, h: 0.8 },
-      { type: 'fill', color: '#d29922', x: 11.8, y: 3.2, w: 1, h: 0.8 },
-      // Character
-      { tile: '__CHARACTER_SIT__', x: 6, y: 7 },
-    ]
-  },
-
-  // 8. Sunrise
-  'sunrise': {
-    width: 16, height: 12,
-    caption: 'Is this what rested feels like?',
-    bg: '#1a1a2e',
-    layers: [
-      // Indoor walls
-      { type: 'fill', color: '#1a1a2e', x: 0, y: 0, w: 16, h: 8 },
-      // Floor
-      { type: 'fill', color: '#2a2015', x: 0, y: 8, w: 16, h: 4 },
-      { type: 'fill', color: '#332818', x: 0, y: 10, w: 16, h: 0.1 },
-      // Window with sunrise gradient
-      { type: 'fill', color: '#1a1a2e', x: 5, y: 1, w: 6, h: 0.5 },
-      { type: 'fill', color: '#f0883e', x: 5, y: 1.5, w: 6, h: 1 },
-      { type: 'fill', color: '#f0e68c', x: 5, y: 2.5, w: 6, h: 1 },
-      { type: 'fill', color: '#ffedd5', x: 5, y: 3.5, w: 6, h: 0.5 },
+      // Sky
+      { type: 'fill', color: '#87ceeb', x: 0, y: 0, w: 16, h: 5 },
       // Sun
-      { type: 'fill', color: '#ffd700', x: 7.5, y: 2, w: 1, h: 1 },
-      // Window frame
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 0.8, w: 0.2, h: 3.4 },
-      { type: 'fill', color: '#4a3520', x: 11, y: 0.8, w: 0.2, h: 3.4 },
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 0.8, w: 6.4, h: 0.2 },
-      { type: 'fill', color: '#4a3520', x: 4.8, y: 4, w: 6.4, h: 0.2 },
-      // Warm light spill from window
-      { type: 'fill', color: 'rgba(240,136,62,0.08)', x: 3, y: 0, w: 10, h: 12 },
-      // Rug
-      { type: 'fill', color: '#6e4a2a', x: 4, y: 9, w: 7, h: 2 },
-      { type: 'fill', color: '#5a422a', x: 4.3, y: 9.2, w: 6.4, h: 1.6 },
-      // Plant
-      { type: 'fill', color: '#3d2c18', x: 2, y: 9.5, w: 0.6, h: 0.8 },
-      { type: 'fill', color: '#3fb950', x: 1.7, y: 8.5, w: 0.5, h: 1.2 },
-      { type: 'fill', color: '#2ea043', x: 2.2, y: 8.8, w: 0.5, h: 0.9 },
-      // Character standing (stretching)
-      { tile: '__CHARACTER_IDLE__', x: 8, y: 7 },
+      { type: 'fill', color: '#f0e68c', x: 12, y: 1, w: 2, h: 2 },
+      { type: 'fill', color: '#f0883e', x: 13, y: 2, w: 1, h: 1 },
+      // Water
+      { type: 'fill', color: '#4a90d9', x: 0, y: 5, w: 16, h: 2 },
+      { type: 'fill', color: '#58a6ff', x: 2, y: 5, w: 1, h: 1 },
+      { type: 'fill', color: '#58a6ff', x: 8, y: 6, w: 1, h: 1 },
+      { type: 'fill', color: '#e6edf3', x: 5, y: 5, w: 1, h: 1 },
+      // Sand
+      { type: 'fill', color: '#d2c290', x: 0, y: 7, w: 16, h: 5 },
+      { type: 'fill', color: '#c2b280', x: 0, y: 7, w: 16, h: 1 },
+      // Palm tree (2×3)
+      ...mt('interiors', 12, 44, 2, 3, 2, 4),
+      // Beach blanket (fill)
+      { type: 'fill', color: '#f85149', x: 9, y: 9, w: 3, h: 1 },
+      { type: 'fill', color: '#58a6ff', x: 9, y: 10, w: 3, h: 1 },
+      // Character on beach
+      { tile: CHAR_IDLE, x: 7, y: 8 },
     ]
   },
 
-  // 9. Payday — first revenue
   'payday': {
     width: 16, height: 12,
     caption: '{name}\'s first dollar.',
-    bg: '#0d1117',
     layers: [
-      // Dark ambient
-      { type: 'fill', color: '#0d1117', x: 0, y: 0, w: 16, h: 12 },
-      // Phone shape
-      { type: 'fill', color: '#30363d', x: 6, y: 2, w: 4, h: 6.5 },
-      { type: 'fill', color: '#21262d', x: 6.3, y: 2.5, w: 3.4, h: 5.5 },
-      // Phone screen notch
-      { type: 'fill', color: '#30363d', x: 7.5, y: 2.2, w: 1, h: 0.2 },
-      // Notification banner
-      { type: 'fill', color: '#1c2128', x: 6.5, y: 3, w: 3, h: 1.2 },
-      { type: 'fill', color: '#58a6ff', x: 6.7, y: 3.1, w: 0.4, h: 0.4 },
-      { type: 'fill', color: '#e6edf3', x: 7.3, y: 3.2, w: 1.5, h: 0.15 },
-      { type: 'fill', color: '#8b949e', x: 7.3, y: 3.5, w: 1, h: 0.15 },
-      // Money amount
-      { type: 'fill', color: '#3fb950', x: 7, y: 4.8, w: 2, h: 0.8 },
-      // Dollar sign
-      { type: 'fill', color: '#e6edf3', x: 7.3, y: 5.8, w: 0.3, h: 0.3 },
-      { type: 'fill', color: '#8b949e', x: 7.8, y: 5.8, w: 1.2, h: 0.2 },
-      // Green glow from phone
-      { type: 'fill', color: 'rgba(63,185,80,0.12)', x: 4, y: 1, w: 8, h: 9 },
-      // Character with phone
-      { tile: '__CHARACTER_PHONE__', x: 8, y: 8 },
+      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_MINT_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_MINT_B, x: 0, y: 2, w: 16, h: 2 },
+      // Window
+      ...mt('interiors', 0, 26, 2, 2, 7, 1),
+      // Bookshelf (2×4)
+      ...mt('interiors', 4, 14, 2, 4, 12, 4),
+      // Desk with book (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 6, 6),
+      // Computer tower
+      ...mt('interiors', 12, 40, 1, 2, 8, 6),
+      // Chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 7, y: 8 },
+      // Character celebrating
+      { tile: CHAR_IDLE, x: 4, y: 7 },
+      // Money-green glow
+      { type: 'fill', color: 'rgba(63,185,80,0.12)', x: 0, y: 0, w: 16, h: 12 },
+      // Gold sparkles
+      { type: 'fill', color: '#d29922', x: 3, y: 2, w: 1, h: 1 },
+      { type: 'fill', color: '#d29922', x: 11, y: 1, w: 1, h: 1 },
+      { type: 'fill', color: '#3fb950', x: 9, y: 3, w: 1, h: 1 },
     ]
   },
 
-  // 10. The Builder — ending scene
+  'sunrise': {
+    width: 16, height: 12,
+    caption: 'Is this what rested feels like?',
+    layers: [
+      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
+      // Sunrise glow behind window
+      { type: 'fill', color: '#f0e68c', x: 6, y: 0, w: 5, h: 3 },
+      // Wide window (4×2)
+      ...mt('interiors', 0, 28, 4, 2, 6, 1),
+      // Green bed (3×4)
+      ...mt('interiors', 0, 0, 3, 4, 1, 4),
+      // Nightstand
+      { tile: { s: 'interiors', c: 3, r: 6 }, x: 4, y: 6 },
+      // Potted plant (2×3)
+      ...mt('interiors', 10, 44, 2, 3, 13, 5),
+      // Character (just woke up)
+      { tile: CHAR_IDLE, x: 10, y: 7 },
+      // Warm morning light
+      { type: 'fill', color: 'rgba(240,230,140,0.1)', x: 0, y: 0, w: 16, h: 12 },
+    ]
+  },
+
   'ending-builder': {
     width: 16, height: 12,
     caption: 'The Builder.',
-    bg: '#0d1117',
     layers: [
-      // Clean dark walls
-      { type: 'fill', color: '#161b22', x: 0, y: 0, w: 16, h: 8 },
-      { type: 'fill', color: '#21262d', x: 0, y: 7.5, w: 16, h: 0.5 },
-      // Nice floor
-      { type: 'fill', color: '#1c1c1c', x: 0, y: 8, w: 16, h: 4 },
-      // Overhead warm light
-      { type: 'fill', color: 'rgba(210,153,34,0.06)', x: 4, y: 0, w: 8, h: 12 },
-      // Large desk
-      { type: 'fill', color: '#4a3520', x: 1, y: 8, w: 13, h: 0.5 },
-      { type: 'fill', color: '#3d2c18', x: 1, y: 8.5, w: 0.4, h: 2.5 },
-      { type: 'fill', color: '#3d2c18', x: 13.6, y: 8.5, w: 0.4, h: 2.5 },
-      // Left monitor (green)
-      { type: 'fill', color: '#30363d', x: 1.5, y: 5.5, w: 2.5, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 1.7, y: 5.7, w: 2.1, h: 1.5 },
-      { type: 'fill', color: '#3fb950', x: 2, y: 6, w: 0.8, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 2, y: 6.3, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 2, y: 6.6, w: 1, h: 0.1 },
-      { type: 'fill', color: '#30363d', x: 2.5, y: 7.5, w: 0.5, h: 0.5 },
-      // Center monitor (blue - main)
-      { type: 'fill', color: '#30363d', x: 5.5, y: 5, w: 3.5, h: 2.5 },
-      { type: 'fill', color: '#0d1117', x: 5.7, y: 5.2, w: 3.1, h: 2 },
-      { type: 'fill', color: '#58a6ff', x: 6, y: 5.5, w: 2, h: 0.3 },
-      { type: 'fill', color: '#e6edf3', x: 6, y: 5.9, w: 1.5, h: 0.15 },
-      { type: 'fill', color: '#3fb950', x: 6, y: 6.2, w: 1, h: 0.15 },
-      { type: 'fill', color: '#8b949e', x: 6, y: 6.5, w: 2, h: 0.1 },
-      { type: 'fill', color: '#30363d', x: 7, y: 7.5, w: 0.5, h: 0.5 },
-      // Right monitor (orange)
-      { type: 'fill', color: '#30363d', x: 10.5, y: 5.5, w: 2.5, h: 2 },
-      { type: 'fill', color: '#0d1117', x: 10.7, y: 5.7, w: 2.1, h: 1.5 },
-      { type: 'fill', color: '#f0883e', x: 11, y: 6, w: 0.8, h: 0.15 },
-      { type: 'fill', color: '#f0883e', x: 11, y: 6.3, w: 0.5, h: 0.15 },
-      { type: 'fill', color: '#30363d', x: 11.5, y: 7.5, w: 0.5, h: 0.5 },
-      // Bookshelf on right
-      { type: 'fill', color: '#4a3520', x: 14, y: 3, w: 1.5, h: 5 },
-      { type: 'fill', color: '#3d2c18', x: 14.1, y: 3.2, w: 1.3, h: 0.2 },
-      { type: 'fill', color: '#3d2c18', x: 14.1, y: 4.5, w: 1.3, h: 0.2 },
-      { type: 'fill', color: '#3d2c18', x: 14.1, y: 5.8, w: 1.3, h: 0.2 },
-      { type: 'fill', color: '#58a6ff', x: 14.2, y: 3.5, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#3fb950', x: 14.6, y: 3.5, w: 0.3, h: 0.9 },
-      { type: 'fill', color: '#d29922', x: 15, y: 3.5, w: 0.2, h: 0.9 },
-      { type: 'fill', color: '#f0883e', x: 14.2, y: 4.8, w: 0.4, h: 0.9 },
-      { type: 'fill', color: '#f85149', x: 14.7, y: 4.8, w: 0.3, h: 0.9 },
-      // Tall plant on left
-      { type: 'fill', color: '#3d2c18', x: 0.2, y: 7, w: 0.6, h: 1 },
-      { type: 'fill', color: '#3fb950', x: -0.1, y: 5, w: 0.6, h: 2.2 },
-      { type: 'fill', color: '#2ea043', x: 0.5, y: 5.5, w: 0.6, h: 1.7 },
-      { type: 'fill', color: '#3fb950', x: 0.9, y: 6, w: 0.3, h: 1.2 },
-      // Character standing proud
-      { tile: '__CHARACTER_IDLE__', x: 7, y: 7.5 },
+      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
+      // Paintings on wall
+      ...mt('interiors', 0, 13, 2, 1, 2, 2),
+      ...mt('interiors', 3, 14, 2, 1, 12, 2),
+      // Globe on stand (1×2)
+      ...mt('interiors', 14, 36, 1, 2, 10, 5),
+      // Bookshelf left (2×4)
+      ...mt('interiors', 4, 14, 2, 4, 0, 4),
+      // Center desk (2×2)
+      ...mt('interiors', 5, 36, 2, 2, 6, 6),
+      // Computer tower
+      ...mt('interiors', 12, 40, 1, 2, 8, 6),
+      // Chair
+      { tile: { s: 'interiors', c: 3, r: 32 }, x: 7, y: 8 },
+      // Large plant (2×3)
+      ...mt('interiors', 10, 44, 2, 3, 13, 5),
+      // Palm tree (2×3)
+      ...mt('interiors', 12, 44, 2, 3, 3, 5),
+      // Standing lamp (1×2)
+      ...mt('interiors', 11, 52, 1, 2, 15, 5),
+      // Character (triumphant)
+      { tile: CHAR_IDLE, x: 5, y: 7 },
+      // Golden glow
+      { type: 'fill', color: 'rgba(210,153,34,0.08)', x: 0, y: 0, w: 16, h: 12 },
     ]
-  },
+  }
 };
 
-// --- Scene Renderer ---
+// ── Rendering Engine ──
+
+function drawTile(ctx, tile, x, y) {
+  if (typeof tile === 'string' && tile.startsWith('__CHARACTER_')) {
+    drawCharacterTile(ctx, tile, x, y);
+    return;
+  }
+  const sheet = sheetImages[tile.s];
+  if (!sheet || !sheet.complete) return;
+  ctx.drawImage(sheet,
+    tile.c * TILE_SIZE, tile.r * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+    x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE
+  );
+}
+
+function drawCharacterTile(ctx, token, x, y) {
+  const poseMap = {
+    '__CHARACTER_SIT__': 'char_sit2',
+    '__CHARACTER_IDLE__': 'char_idle',
+    '__CHARACTER_PHONE__': 'char_phone',
+  };
+  const sheet = sheetImages[poseMap[token]];
+  if (!sheet || !sheet.complete) return;
+  // Character sprite: 1 tile wide × 2 tiles tall (16×32), first frame
+  ctx.drawImage(sheet,
+    0, 0, TILE_SIZE, TILE_SIZE * 2,
+    x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE * 2
+  );
+}
+
+function drawTileFill(ctx, tile, x, y, w, h) {
+  for (let ty = y; ty < y + h; ty++)
+    for (let tx = x; tx < x + w; tx++)
+      drawTile(ctx, tile, tx, ty);
+}
 
 function renderSceneToCanvas(sceneId) {
   const scene = SCENES[sceneId];
   if (!scene) return null;
 
-  const w = scene.width * TILE_SIZE;
-  const h = scene.height * TILE_SIZE;
-
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = scene.width * TILE_SIZE;
+  canvas.height = scene.height * TILE_SIZE;
   canvas.className = 'pixel-scene';
 
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
-  // Fill background
-  if (scene.bg) {
-    ctx.fillStyle = scene.bg;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  // Draw each layer
   for (const layer of scene.layers) {
     if (layer.type === 'fill') {
-      drawFill(ctx, layer);
+      ctx.fillStyle = layer.color;
+      ctx.fillRect(
+        layer.x * TILE_SIZE, layer.y * TILE_SIZE,
+        layer.w * TILE_SIZE, layer.h * TILE_SIZE
+      );
+    } else if (layer.type === 'tile-fill') {
+      drawTileFill(ctx, layer.tile, layer.x, layer.y, layer.w, layer.h);
     } else if (layer.tile) {
-      drawSpriteTile(ctx, layer);
+      drawTile(ctx, layer.tile, layer.x, layer.y);
     }
   }
 
   return canvas;
 }
 
-function drawFill(ctx, layer) {
-  ctx.fillStyle = layer.color;
-  ctx.fillRect(
-    layer.x * TILE_SIZE,
-    layer.y * TILE_SIZE,
-    layer.w * TILE_SIZE,
-    layer.h * TILE_SIZE
-  );
-}
-
-function drawSpriteTile(ctx, layer) {
-  let tileName = layer.tile;
-
-  // Resolve character sentinel tokens
-  if (tileName && tileName.startsWith('__CHARACTER_')) {
-    tileName = resolveCharacterTile(tileName);
-  }
-
-  const atlas = TILE_ATLAS[tileName];
-  if (!atlas) return;
-
-  const img = sheetImages[atlas.sheet];
-  if (!img) return;
-
-  const tileW = (atlas.w || 1);
-  const tileH = (atlas.h || 1);
-  const sw = tileW * TILE_SIZE;
-  const sh = tileH * TILE_SIZE;
-  const sx = atlas.col * TILE_SIZE;
-  const sy = atlas.row * TILE_SIZE;
-
-  ctx.drawImage(img,
-    sx, sy, sw, sh,
-    layer.x * TILE_SIZE,
-    layer.y * TILE_SIZE,
-    sw, sh
-  );
-}
-
-function resolveCharacterTile(sentinel) {
-  const charName = (typeof state !== 'undefined' && state.character) || 'Adam';
-  const name = charName.toLowerCase();
-
-  switch (sentinel) {
-    case '__CHARACTER_SIT__':   return `char-${name}-sit`;
-    case '__CHARACTER_IDLE__':  return `char-${name}-idle`;
-    case '__CHARACTER_PHONE__': return `char-${name}-phone`;
-    default:                    return `char-${name}-idle`;
-  }
-}
-
-// --- Scene Cache ---
-const sceneCache = {};
-
 function getSceneCanvas(sceneId) {
-  const charKey = (typeof state !== 'undefined' && state.character) || 'Adam';
-  const cacheKey = sceneId + '-' + charKey;
-
-  if (!sceneCache[cacheKey]) {
-    sceneCache[cacheKey] = renderSceneToCanvas(sceneId);
+  if (!sceneCache[sceneId]) {
+    sceneCache[sceneId] = renderSceneToCanvas(sceneId);
   }
+  const src = sceneCache[sceneId];
+  if (!src) return null;
 
-  const cached = sceneCache[cacheKey];
-  if (!cached) return null;
-
-  // Clone the canvas for DOM insertion
-  const clone = document.createElement('canvas');
-  clone.width = cached.width;
-  clone.height = cached.height;
-  clone.className = cached.className;
-  clone.getContext('2d').drawImage(cached, 0, 0);
-  return clone;
-}
-
-function clearSceneCache() {
-  Object.keys(sceneCache).forEach(k => delete sceneCache[k]);
+  // Canvas cloneNode doesn't preserve content — draw copy
+  const copy = document.createElement('canvas');
+  copy.width = src.width;
+  copy.height = src.height;
+  copy.className = 'pixel-scene';
+  const copyCtx = copy.getContext('2d');
+  copyCtx.imageSmoothingEnabled = false;
+  copyCtx.drawImage(src, 0, 0);
+  return copy;
 }
