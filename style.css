@@ -1,0 +1,658 @@
+/* ========================================
+   THE BUILDER TRAIL — Styles (M2)
+   Claude Code-inspired dark terminal theme
+   ======================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+}
+
+#game {
+  width: 100%;
+  max-width: 640px;
+  padding: 24px 16px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+#hud {
+  flex-shrink: 0;
+}
+
+#content {
+  flex: 1;
+}
+
+/* --- Colors --- */
+.green { color: #3fb950; }
+.yellow { color: #d29922; }
+.red { color: #f85149; }
+.dim { color: #8b949e; }
+.blue { color: #58a6ff; }
+.orange { color: #f0883e; }
+
+/* --- HUD --- */
+
+.hud-prompt {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #21262d;
+}
+
+.prompt-path {
+  color: #58a6ff;
+}
+
+.prompt-tool {
+  color: #3fb950;
+  font-size: 12px;
+}
+
+.prompt-separator {
+  color: #8b949e;
+}
+
+.prompt-week {
+  color: #e6edf3;
+}
+
+.hud-resources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #21262d;
+}
+
+.resource-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.resource-label {
+  width: 72px;
+  color: #8b949e;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.resource-bar {
+  font-size: 11px;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+.bar-fill {
+  /* inherits color from .green/.yellow/.red */
+}
+
+.bar-empty {
+  color: #21262d;
+}
+
+.resource-value {
+  color: #e6edf3;
+  font-size: 13px;
+  min-width: 48px;
+}
+
+/* --- Intro --- */
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  min-height: 80dvh;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.intro-line {
+  opacity: 0;
+  animation: introReveal 0.5s ease forwards;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  color: #8b949e;
+  font-size: 12px;
+  margin-bottom: 32px;
+  letter-spacing: 1px;
+}
+
+.intro-text {
+  margin-bottom: 40px;
+  max-width: 420px;
+}
+
+.intro-text p {
+  margin-bottom: 12px;
+  line-height: 1.7;
+  color: #c9d1d9;
+}
+
+/* --- Tool Selection --- */
+
+.tool-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  min-height: 80dvh;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.tool-select-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.tool-select-subtitle {
+  margin-bottom: 32px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.tool-grid .tool-card:last-child {
+  grid-column: 1 / -1;
+  max-width: 255px;
+  justify-self: center;
+}
+
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s, background-color 0.15s;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tool-card:hover,
+.tool-card:focus,
+.tool-card.focused {
+  border-color: #58a6ff;
+  background: #1c2128;
+  outline: none;
+}
+
+.tool-card:active {
+  background: #22272e;
+}
+
+.tool-card .choice-key {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.tool-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.tool-tagline {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.tool-special {
+  font-size: 11px;
+  color: #3fb950;
+  margin-top: 4px;
+}
+
+/* --- Events --- */
+
+.event {
+  animation: fadeIn 0.2s ease;
+}
+
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.event-type {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.event-type.work {
+  background: #131d2f;
+  color: #58a6ff;
+}
+
+.event-type.building {
+  background: #0f2d1a;
+  color: #3fb950;
+}
+
+.event-type.life {
+  background: #2a1a0a;
+  color: #f0883e;
+}
+
+.event-type.quiet {
+  background: #161b22;
+  color: #8b949e;
+}
+
+.event-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.event-text {
+  color: #c9d1d9;
+  margin-bottom: 24px;
+  line-height: 1.7;
+}
+
+.project-desc {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+/* --- Choice Cards --- */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s, background-color 0.15s;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.choice-card:hover,
+.choice-card:focus,
+.choice-card.focused {
+  border-color: #58a6ff;
+  background: #1c2128;
+  outline: none;
+}
+
+.choice-card:active {
+  background: #22272e;
+}
+
+.choice-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  background: #30363d;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  flex-shrink: 0;
+}
+
+.choice-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-label {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.choice-effects {
+  font-size: 12px;
+  color: #8b949e;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* --- Result --- */
+
+.result {
+  animation: fadeIn 0.2s ease;
+}
+
+.result-text {
+  color: #c9d1d9;
+  margin-bottom: 8px;
+  line-height: 1.7;
+  padding: 14px 16px;
+  background: #161b22;
+  border-left: 3px solid #30363d;
+  border-radius: 0 6px 6px 0;
+}
+
+.result-effects {
+  font-size: 12px;
+  padding: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 20px;
+}
+
+/* --- Buttons --- */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-primary:hover {
+  border-color: #58a6ff;
+  background: #1c2128;
+}
+
+.btn-primary:active {
+  background: #22272e;
+}
+
+.btn-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  background: #30363d;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+/* --- Pixel Art Scene Overlay --- */
+
+.scene-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: sceneFadeIn 0.6s ease;
+}
+
+.scene-overlay.hidden {
+  display: none;
+}
+
+.scene-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: sceneSlideUp 0.6s ease;
+}
+
+.pixel-scene {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #30363d;
+  box-shadow: 0 0 40px rgba(88, 166, 255, 0.15), 0 0 80px rgba(88, 166, 255, 0.05);
+  image-rendering: pixelated;
+}
+
+.scene-caption {
+  color: #e6edf3;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  max-width: 300px;
+  letter-spacing: -0.3px;
+}
+
+.scene-dismiss {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* --- Ending --- */
+
+.ending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  min-height: 80dvh;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+  gap: 0;
+}
+
+.ending .pixel-scene {
+  margin-bottom: 24px;
+}
+
+.ending-badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.ending-badge.win { color: #3fb950; }
+.ending-badge.lose { color: #f85149; }
+
+.ending-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+.ending-description {
+  color: #8b949e;
+  max-width: 400px;
+  margin-bottom: 32px;
+  line-height: 1.7;
+}
+
+.ending-stats {
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 32px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #21262d;
+}
+
+.stat-label {
+  color: #8b949e;
+  font-size: 13px;
+}
+
+.stat-value {
+  color: #e6edf3;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* --- Animations --- */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes introReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sceneFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sceneSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Mobile --- */
+
+@media (max-width: 480px) {
+  body {
+    font-size: 13px;
+  }
+
+  #game {
+    padding: 16px 12px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .resource-bar {
+    font-size: 10px;
+  }
+
+  .resource-label {
+    width: 64px;
+    font-size: 10px;
+  }
+
+  .resource-value {
+    font-size: 12px;
+    min-width: 40px;
+  }
+
+  .choice-card {
+    padding: 14px 14px;
+  }
+
+  .event-title {
+    font-size: 15px;
+  }
+
+  .btn-key {
+    display: none;
+  }
+
+  .ending-title {
+    font-size: 24px;
+  }
+
+  .tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-grid .tool-card:last-child {
+    max-width: none;
+  }
+
+  .pixel-scene div {
+    /* Slightly smaller pixels on mobile */
+  }
+}
