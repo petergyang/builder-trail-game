@@ -82,7 +82,11 @@ const state = {
   zeroMomentumWeeks: 0,
   lastEventId: null,
   currentEvent: null,
-  phase: 'intro', // intro | toolSelect | projectSelect | event | result | ending
+  phase: 'intro', // intro | nameCharacterSelect | toolSelect | projectSelect | event | result | ending
+
+  // Player identity
+  playerName: '',
+  character: 'Adam', // Adam | Alex | Amelia | Bob
 
   // M2: Tool system
   tool: null,
@@ -109,6 +113,7 @@ let hudEl, contentEl;
 function init() {
   hudEl = document.getElementById('hud');
   contentEl = document.getElementById('content');
+  preloadSheets(); // Load tileset sprite sheets for scene rendering
   renderIntro();
   document.addEventListener('keydown', handleKeydown);
 }
@@ -130,11 +135,79 @@ function renderIntro() {
         <p class="intro-line" style="animation-delay: 2.2s">One night, you open a code editor.</p>
         <p class="intro-line dim" style="animation-delay: 3.2s">You have 52 weeks. Ship apps. Don't burn out.</p>
       </div>
-      <button class="btn-primary intro-line" style="animation-delay: 4.0s" onclick="renderToolSelect()">
+      <button class="btn-primary intro-line" style="animation-delay: 4.0s" onclick="renderNameCharacterSelect()">
         <span class="btn-key">Enter</span> Begin
       </button>
     </div>
   `;
+}
+
+function renderNameCharacterSelect() {
+  state.phase = 'nameCharacterSelect';
+  hudEl.innerHTML = '';
+
+  const characters = ['Adam', 'Alex', 'Amelia', 'Bob'];
+  const charCards = characters.map((name, i) => `
+    <button class="character-card ${i === 0 ? 'selected' : ''}" data-char="${name}" onclick="selectCharPreview('${name}')">
+      <div class="char-sprite" style="
+        background-image: url('assets/${name}_idle_16x16.png');
+        background-position: 0 0;
+        background-size: ${64 * 4}px ${32 * 4}px;
+        width: ${16 * 4}px;
+        height: ${32 * 4}px;
+        image-rendering: pixelated;
+      "></div>
+    </button>
+  `).join('');
+
+  contentEl.innerHTML = `
+    <div class="name-select">
+      <h2 class="tool-select-title">Who are you?</h2>
+      <p class="dim" style="margin-bottom: 24px;">Every builder needs a name.</p>
+
+      <div class="name-input-row">
+        <label class="resource-label" for="player-name">NAME</label>
+        <input type="text" id="player-name" class="name-input"
+               maxlength="16" placeholder="Enter your name"
+               autocomplete="off" />
+      </div>
+
+      <p class="dim" style="margin: 28px 0 16px;">Choose your character:</p>
+      <div class="character-grid">${charCards}</div>
+
+      <button class="btn-primary" onclick="confirmNameCharacter()" style="margin-top: 28px;">
+        <span class="btn-key">Enter</span> Continue
+      </button>
+    </div>
+  `;
+
+  // Focus the name input after render
+  setTimeout(() => {
+    const input = document.getElementById('player-name');
+    if (input) input.focus();
+  }, 100);
+}
+
+function selectCharPreview(name) {
+  state.character = name;
+  const cards = contentEl.querySelectorAll('.character-card');
+  cards.forEach(c => {
+    c.classList.toggle('selected', c.dataset.char === name);
+  });
+}
+
+function confirmNameCharacter() {
+  if (state.phase !== 'nameCharacterSelect') return;
+  const input = document.getElementById('player-name');
+  const name = input ? input.value.trim() : '';
+  state.playerName = name || 'Builder';
+
+  // Preload character sprite sheets (HUD animation + scene tiles)
+  preloadCharacterSheets(state.character);
+  loadCharacterTiles(state.character);
+  clearSceneCache();
+
+  renderToolSelect();
 }
 
 function renderToolSelect() {
@@ -206,13 +279,19 @@ function renderHUD() {
       </div>`
     : '';
 
+  const charName = state.character || 'Adam';
+  const displayName = state.playerName || 'builder';
+
   hudEl.innerHTML = `
-    <div class="hud-prompt">
-      <span class="prompt-path">~/builder-trail</span>${toolBit}
-      <span class="prompt-separator"> $ </span>
-      <span class="prompt-week">week ${state.week} of ${TOTAL_WEEKS}</span>
-    </div>
-    <div class="hud-resources">
+    <div class="hud-row">
+      <div class="hud-sprite hud-sprite-${charName.toLowerCase()}"></div>
+      <div class="hud-text">
+        <div class="hud-prompt">
+          <span class="prompt-path">~/${displayName.toLowerCase()}/trail</span>${toolBit}
+          <span class="prompt-separator"> $ </span>
+          <span class="prompt-week">week ${state.week} of ${TOTAL_WEEKS}</span>
+        </div>
+        <div class="hud-resources">
       <div class="resource-row">
         <span class="resource-label">SAVINGS</span>
         <span class="resource-value ${getSavingsColor()}">${formatMoney(state.savings)}${state.totalPassiveIncome > 0 ? ' <span class="dim green">(+' + formatMoney(state.totalPassiveIncome) + '/wk)</span>' : ''}</span>
@@ -232,6 +311,8 @@ function renderHUD() {
         <span class="resource-value">${state.appsShipped} app${state.appsShipped !== 1 ? 's' : ''}</span>
       </div>
       ${projectHTML}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -278,9 +359,9 @@ function renderWeek() {
           <span class="event-type ${event.type}">${event.type}</span>
           <span class="event-title">${event.title}</span>
         </div>
-        <p class="event-text">${event.text}</p>
+        <p class="event-text">${personalize(event.text)}</p>
         <div class="result">
-          <p class="result-text">${choice.result}</p>
+          <p class="result-text">${personalize(choice.result)}</p>
           <div class="result-effects">${formatEffectsHTML(choice.effects)}</div>
         </div>
         <button class="btn-primary" onclick="nextWeek()">
@@ -308,7 +389,7 @@ function renderWeek() {
           <span class="event-type ${event.type}">${event.type}</span>
           <span class="event-title">${event.title}</span>
         </div>
-        <p class="event-text">${event.text}</p>
+        <p class="event-text">${personalize(event.text)}</p>
         <div class="choices">${choicesHTML}</div>
       </div>
     `;
@@ -332,7 +413,7 @@ function renderResult(resultText, effects) {
 function renderResultInner(resultText, effects) {
   contentEl.innerHTML = `
     <div class="result">
-      <p class="result-text">${resultText}</p>
+      <p class="result-text">${personalize(resultText)}</p>
       <div class="result-effects">${formatEffectsHTML(effects)}</div>
       <button class="btn-primary" onclick="nextWeek()">
         <span class="btn-key">Enter</span> Next Week
@@ -389,6 +470,7 @@ function renderEnding() {
         </button>
       </div>
     `;
+    hydrateScenes(contentEl);
   };
 
   // Show ending scene overlay if available
@@ -806,22 +888,22 @@ function checkInflectionPoints() {
 // --- Pixel Art Scene Overlay ---
 
 function renderPixelArt(sceneId) {
+  // Returns a placeholder; call hydrateScene() after innerHTML is set
   const scene = SCENES[sceneId];
   if (!scene) return '';
+  return `<div class="scene-placeholder" data-scene="${sceneId}"></div>`;
+}
 
-  const cellSize = 16;
-  let cellsHTML = '';
-  for (let i = 0; i < scene.pixels.length; i++) {
-    cellsHTML += `<div style="background:${scene.pixels[i]}"></div>`;
-  }
-
-  return `
-    <div class="pixel-scene" style="
-      display:grid;
-      grid-template-columns:repeat(${scene.width}, ${cellSize}px);
-      grid-template-rows:repeat(${scene.height}, ${cellSize}px);
-    ">${cellsHTML}</div>
-  `;
+function hydrateScenes(container) {
+  const placeholders = (container || document).querySelectorAll('.scene-placeholder');
+  placeholders.forEach(ph => {
+    const canvas = getSceneCanvas(ph.dataset.scene);
+    if (canvas) {
+      canvas.style.width = (SCENES[ph.dataset.scene].width * TILE_SIZE * SCENE_SCALE) + 'px';
+      canvas.style.height = (SCENES[ph.dataset.scene].height * TILE_SIZE * SCENE_SCALE) + 'px';
+      ph.replaceWith(canvas);
+    }
+  });
 }
 
 function showSceneOverlay(sceneId, callback) {
@@ -834,10 +916,11 @@ function showSceneOverlay(sceneId, callback) {
   overlay.innerHTML = `
     <div class="scene-card">
       ${renderPixelArt(sceneId)}
-      <div class="scene-caption">${scene.caption}</div>
+      <div class="scene-caption">${personalize(scene.caption)}</div>
       <div class="scene-dismiss dim">Press any key or tap to continue</div>
     </div>
   `;
+  hydrateScenes(overlay);
   overlay.classList.remove('hidden');
 
   const dismiss = () => {
@@ -852,6 +935,19 @@ function showSceneOverlay(sceneId, callback) {
     document.addEventListener('keydown', dismiss, { once: true });
     overlay.addEventListener('click', dismiss, { once: true });
   }, 300);
+}
+
+function personalize(text) {
+  if (!text || !state.playerName) return text;
+  return text.replace(/\{name\}/g, state.playerName);
+}
+
+function preloadCharacterSheets(charName) {
+  const sheets = ['idle_anim', 'sit2', 'phone'];
+  sheets.forEach(sheet => {
+    const img = new Image();
+    img.src = `assets/${charName}_${sheet}_16x16.png`;
+  });
 }
 
 function clamp(val, min, max) {
@@ -951,8 +1047,32 @@ function handleKeydown(e) {
   const overlay = document.getElementById('scene-overlay');
   if (overlay && !overlay.classList.contains('hidden')) return;
 
+  // Don't process game keys while typing in an input field
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.phase === 'nameCharacterSelect') confirmNameCharacter();
+    }
+    return;
+  }
+
   if (state.phase === 'intro' && e.key === 'Enter') {
-    renderToolSelect();
+    renderNameCharacterSelect();
+    return;
+  }
+
+  if (state.phase === 'nameCharacterSelect') {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const chars = ['Adam', 'Alex', 'Amelia', 'Bob'];
+      const curIdx = chars.indexOf(state.character);
+      const newIdx = e.key === 'ArrowRight' ? (curIdx + 1) % 4 : (curIdx + 3) % 4;
+      selectCharPreview(chars[newIdx]);
+      return;
+    }
+    if (e.key === 'Enter') {
+      confirmNameCharacter();
+      return;
+    }
     return;
   }
 
