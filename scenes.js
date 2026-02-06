@@ -1,17 +1,18 @@
 // ========================================
 // THE BUILDER TRAIL — Tile-Based Pixel Art Scenes
 // ========================================
-// Uses LimeZu "Modern tiles_Free" sprite sheets
-// Tile coords: (col, row) 0-indexed, 16×16px per tile
+// Uses LimeZu "Modern tiles_Free" sprite sheets (48×48 variant)
+// Tile coords: (col, row) 0-indexed, 48×48px per tile
+// Grid: 16 cols × 89 rows (Interiors), 17 cols × 23 rows (Room_Builder)
 
-const TILE_SIZE = 16;
-const SCENE_SCALE = 3;
+const TILE_SIZE = 48;
+const SCENE_SCALE = 1;
 
 // ── Sprite Sheet Loading ──
 
 const SPRITE_SHEETS = {
-  interiors: 'assets/Interiors_free_16x16.png',
-  rooms: 'assets/Room_Builder_free_16x16.png'
+  interiors: 'assets/Interiors_free_48x48.png',
+  rooms: 'assets/Room_Builder_free_48x48.png'
 };
 
 const sheetImages = {};
@@ -38,36 +39,37 @@ function clearSceneCache() {
   for (const k of Object.keys(sceneCache)) delete sceneCache[k];
 }
 
-// ── Tile Shorthand ──
-// { s: sheetKey, c: col, r: row }
+// ── Tile Definitions ──
+// Room_Builder walls: paired rows (top=crown, bot=baseboard), col 4 for mid-fill
+// Room_Builder floors: cols 11-16 right side
 
 const T = {
-  // Room_Builder — Wall surfaces (paired rows: top has crown, bottom has baseboard)
-  // Col groups 0-1, 4-5, 7-8 are sub-variants; use col 4-5 for clean mid-wall fill
-  WALL_CREAM_T:  { s: 'rooms', c: 4, r: 7 },   // Yellow/cream
-  WALL_CREAM_B:  { s: 'rooms', c: 4, r: 8 },
-  WALL_WHITE_T:  { s: 'rooms', c: 4, r: 17 },  // White/cream flat
-  WALL_WHITE_B:  { s: 'rooms', c: 4, r: 18 },
-  WALL_WARM_T:   { s: 'rooms', c: 4, r: 5 },   // Salmon/coral
-  WALL_WARM_B:   { s: 'rooms', c: 4, r: 6 },
-  WALL_BLUE_T:   { s: 'rooms', c: 4, r: 19 },  // Blue/lavender
-  WALL_BLUE_B:   { s: 'rooms', c: 4, r: 20 },
-  WALL_DARK_T:   { s: 'rooms', c: 4, r: 15 },  // Dark wood panel
-  WALL_DARK_B:   { s: 'rooms', c: 4, r: 16 },
-  WALL_MINT_T:   { s: 'rooms', c: 4, r: 11 },  // Mint/teal
-  WALL_MINT_B:   { s: 'rooms', c: 4, r: 12 },
-  WALL_BEIGE_T:  { s: 'rooms', c: 4, r: 21 },  // Beige/tan
-  WALL_BEIGE_B:  { s: 'rooms', c: 4, r: 22 },
+  // Walls (col 4, mid-section for clean tiling)
+  WALL_SALMON_T:   { s: 'rooms', c: 4, r: 5 },
+  WALL_SALMON_B:   { s: 'rooms', c: 4, r: 6 },
+  WALL_CREAM_T:    { s: 'rooms', c: 4, r: 7 },
+  WALL_CREAM_B:    { s: 'rooms', c: 4, r: 8 },
+  WALL_MINT_T:     { s: 'rooms', c: 4, r: 9 },
+  WALL_MINT_B:     { s: 'rooms', c: 4, r: 10 },
+  WALL_WOOD_T:     { s: 'rooms', c: 4, r: 11 },
+  WALL_WOOD_B:     { s: 'rooms', c: 4, r: 12 },
+  WALL_LWOOD_T:    { s: 'rooms', c: 4, r: 13 },
+  WALL_LWOOD_B:    { s: 'rooms', c: 4, r: 14 },
+  WALL_ORANGE_T:   { s: 'rooms', c: 4, r: 15 },
+  WALL_ORANGE_B:   { s: 'rooms', c: 4, r: 16 },
+  WALL_BLUEGRAY_T: { s: 'rooms', c: 4, r: 17 },
+  WALL_BLUEGRAY_B: { s: 'rooms', c: 4, r: 18 },
+  WALL_DKBLUE_T:   { s: 'rooms', c: 4, r: 19 },
+  WALL_DKBLUE_B:   { s: 'rooms', c: 4, r: 20 },
+  WALL_BEIGE_T:    { s: 'rooms', c: 4, r: 21 },
+  WALL_BEIGE_B:    { s: 'rooms', c: 4, r: 22 },
 
-  // Room_Builder — Floors (cols 10-16 area, proper floor tiles)
-  FLOOR_GRAY:    { s: 'rooms', c: 11, r: 11 },  // Gray smooth
-  FLOOR_CREAM:   { s: 'rooms', c: 11, r: 7 },   // Yellow/cream tile
-  FLOOR_BLUE:    { s: 'rooms', c: 11, r: 9 },   // Light blue patterned
-  FLOOR_HERRING: { s: 'rooms', c: 11, r: 13 },  // Orange herringbone
-  FLOOR_STONE:   { s: 'rooms', c: 15, r: 5 },   // Gray stone
-  // Wood-look floors (using mid-col wood panel for cleaner tiling)
-  FLOOR_WOOD:    { s: 'rooms', c: 5, r: 13 },   // Light wood
-  FLOOR_WOOD_D:  { s: 'rooms', c: 5, r: 15 },   // Dark wood
+  // Floors (right side of Room_Builder)
+  FLOOR_RED:      { s: 'rooms', c: 11, r: 5 },
+  FLOOR_YELLOW:   { s: 'rooms', c: 11, r: 7 },
+  FLOOR_CYAN:     { s: 'rooms', c: 11, r: 9 },
+  FLOOR_GRAY:     { s: 'rooms', c: 11, r: 11 },
+  FLOOR_HERRING:  { s: 'rooms', c: 11, r: 13 },
 };
 
 // Character sentinels
@@ -84,8 +86,8 @@ function mt(sheet, sc, sr, w, h, dx, dy) {
 }
 
 // ── Scene Definitions ──
-// Each scene: 16 wide × 12 tall tiles
-// Layers drawn bottom→top: floor fill, wall fill, furniture, character, overlays
+// Layout: 16 wide × 12 tall tiles
+// Rows 0-1: top wall | Rows 2-3: bottom wall | Rows 4-11: floor + furniture
 
 const SCENES = {
 
@@ -93,29 +95,25 @@ const SCENES = {
     width: 16, height: 12,
     caption: '{name} shipped something real.',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
-      // Double window on wall
-      ...mt('interiors', 0, 26, 2, 2, 7, 1),
-      // Bookshelf against wall (2×4)
-      ...mt('interiors', 4, 14, 2, 4, 1, 4),
-      // Desk with open book (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 7, 6),
-      // Computer tower
-      ...mt('interiors', 12, 40, 1, 2, 9, 6),
-      // Chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 8, y: 8 },
-      // Large potted plant (2×3)
-      ...mt('interiors', 10, 44, 2, 3, 13, 5),
+      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
+      // Curtained window on wall
+      ...mt('interiors', 4, 24, 2, 2, 3, 2),
+      // Red 4-pane window on wall
+      ...mt('interiors', 7, 24, 2, 2, 10, 2),
+      // Colorful bookshelf against wall (2×2)
+      ...mt('interiors', 5, 14, 2, 2, 13, 4),
+      // Wide table as desk (2×2)
+      ...mt('interiors', 5, 10, 2, 2, 6, 6),
+      // Computer tower beside desk (1×2)
+      ...mt('interiors', 12, 40, 1, 2, 8, 6),
+      // Green bushy plant (2×2)
+      ...mt('interiors', 10, 44, 2, 2, 1, 5),
       // Character sitting at desk
-      { tile: CHAR_SIT, x: 8, y: 7 },
-      // Confetti
-      { type: 'fill', color: '#3fb950', x: 3, y: 1, w: 1, h: 1 },
-      { type: 'fill', color: '#f0883e', x: 12, y: 0, w: 1, h: 1 },
-      { type: 'fill', color: '#58a6ff', x: 10, y: 2, w: 1, h: 1 },
-      { type: 'fill', color: '#f0883e', x: 5, y: 0, w: 1, h: 1 },
-      { type: 'fill', color: '#3fb950', x: 14, y: 3, w: 1, h: 1 },
+      { tile: CHAR_SIT, x: 7, y: 7 },
+      // Subtle celebratory glow
+      { type: 'fill', color: 'rgba(63,185,80,0.08)', x: 0, y: 0, w: 16, h: 12 },
     ]
   },
 
@@ -123,21 +121,21 @@ const SCENES = {
     width: 16, height: 12,
     caption: '{name} pushed too hard.',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_WOOD_D, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_DARK_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_DARK_B, x: 0, y: 2, w: 16, h: 2 },
-      // Desk
-      ...mt('interiors', 5, 36, 2, 2, 6, 6),
-      // Chalkboard as dim monitor (2×2)
-      ...mt('interiors', 10, 40, 2, 2, 7, 4),
-      // Chair
-      { tile: { s: 'interiors', c: 4, r: 32 }, x: 7, y: 8 },
+      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_WOOD_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_WOOD_B, x: 0, y: 2, w: 16, h: 2 },
+      // Flat screen TV on wall
+      { tile: { s: 'interiors', c: 0, r: 14 }, x: 7, y: 3 },
+      // Desk (2×2)
+      ...mt('interiors', 5, 10, 2, 2, 6, 6),
+      // Computer tower (1×2)
+      ...mt('interiors', 12, 40, 1, 2, 8, 6),
       // Character slumped at desk
       { tile: CHAR_SIT, x: 7, y: 7 },
-      // Dark overlay
-      { type: 'fill', color: 'rgba(0,0,0,0.35)', x: 0, y: 0, w: 16, h: 12 },
+      // Dark overlay — exhaustion
+      { type: 'fill', color: 'rgba(0,0,0,0.4)', x: 0, y: 0, w: 16, h: 12 },
       // Dim red glow from screen
-      { type: 'fill', color: 'rgba(248,81,73,0.15)', x: 5, y: 4, w: 6, h: 5 },
+      { type: 'fill', color: 'rgba(248,81,73,0.15)', x: 5, y: 5, w: 6, h: 5 },
     ]
   },
 
@@ -148,18 +146,18 @@ const SCENES = {
       { type: 'tile-fill', tile: T.FLOOR_HERRING, x: 0, y: 0, w: 16, h: 12 },
       { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
       { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
-      // Landscape painting
-      ...mt('interiors', 0, 13, 2, 1, 3, 2),
-      // Large red/gold rug (4×4)
-      ...mt('interiors', 6, 15, 4, 4, 5, 7),
-      // Brown couch (3×2)
-      ...mt('interiors', 6, 13, 3, 2, 6, 5),
-      // Coffee table
-      { tile: { s: 'interiors', c: 5, r: 13 }, x: 7, y: 7 },
-      // Standing lamp (1×2)
-      ...mt('interiors', 11, 52, 1, 2, 1, 5),
-      // Large potted plant (2×3)
-      ...mt('interiors', 10, 44, 2, 3, 13, 4),
+      // Landscape painting on wall
+      { tile: { s: 'interiors', c: 0, r: 12 }, x: 3, y: 3 },
+      // Large framed painting on wall (2×2)
+      ...mt('interiors', 7, 28, 2, 2, 11, 2),
+      // Red/gold rug on floor (3×2)
+      ...mt('interiors', 7, 16, 3, 2, 5, 8),
+      // Orange couch (2×2)
+      ...mt('interiors', 7, 12, 2, 2, 6, 6),
+      // Green bushy plant (2×2)
+      ...mt('interiors', 10, 44, 2, 2, 13, 4),
+      // Small brown table (2×2)
+      ...mt('interiors', 0, 10, 2, 2, 2, 7),
       // Character standing
       { tile: CHAR_IDLE, x: 10, y: 7 },
     ]
@@ -170,26 +168,26 @@ const SCENES = {
     caption: '2:47 AM. It works.',
     layers: [
       { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_BLUE_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_BLUE_B, x: 0, y: 2, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_DKBLUE_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_DKBLUE_B, x: 0, y: 2, w: 16, h: 2 },
       // Night sky behind window
-      { type: 'fill', color: '#0a0a2e', x: 11, y: 1, w: 4, h: 2 },
-      // Wide window (4×2)
-      ...mt('interiors', 0, 28, 4, 2, 11, 1),
-      // Moon
-      { type: 'fill', color: '#e6edf3', x: 13, y: 1, w: 1, h: 1 },
-      // Desk with book (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 5, 6),
-      // Computer tower
+      { type: 'fill', color: '#0a0a2e', x: 10, y: 1, w: 4, h: 3 },
+      // Large modern window (3×2)
+      ...mt('interiors', 0, 28, 3, 2, 10, 2),
+      // Moon glow in window
+      { type: 'fill', color: '#e6edf3', x: 12, y: 1, w: 1, h: 1 },
+      // Colorful bookshelf (2×2)
+      ...mt('interiors', 5, 14, 2, 2, 1, 4),
+      // Desk (2×2)
+      ...mt('interiors', 5, 10, 2, 2, 5, 6),
+      // Computer tower (1×2)
       ...mt('interiors', 12, 40, 1, 2, 7, 6),
-      // Chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 6, y: 8 },
-      // Character sitting
+      // Character sitting at desk
       { tile: CHAR_SIT, x: 6, y: 7 },
-      // Dark overlay
-      { type: 'fill', color: 'rgba(0,0,20,0.4)', x: 0, y: 0, w: 16, h: 12 },
+      // Dark night overlay
+      { type: 'fill', color: 'rgba(0,0,20,0.45)', x: 0, y: 0, w: 16, h: 12 },
       // Monitor glow
-      { type: 'fill', color: 'rgba(88,166,255,0.2)', x: 4, y: 5, w: 5, h: 4 },
+      { type: 'fill', color: 'rgba(88,166,255,0.2)', x: 4, y: 5, w: 5, h: 5 },
     ]
   },
 
@@ -197,27 +195,23 @@ const SCENES = {
     width: 16, height: 12,
     caption: 'Everything clicks.',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
-      // Bulletin board on wall
-      ...mt('interiors', 0, 41, 2, 1, 7, 2),
-      // Calendar/schedule board
-      ...mt('interiors', 14, 38, 2, 2, 11, 1),
+      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
+      // Green chalkboard on wall (2×2)
+      ...mt('interiors', 7, 35, 2, 2, 7, 2),
+      // Frosted window on wall (2×2)
+      ...mt('interiors', 9, 24, 2, 2, 12, 2),
       // Left desk (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 2, 6),
+      ...mt('interiors', 5, 10, 2, 2, 2, 6),
       // Left computer tower
       ...mt('interiors', 12, 40, 1, 2, 4, 6),
       // Right desk (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 10, 6),
+      ...mt('interiors', 5, 10, 2, 2, 10, 6),
       // Right computer tower
       ...mt('interiors', 12, 40, 1, 2, 12, 6),
-      // Left chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 3, y: 8 },
-      // Right chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 11, y: 8 },
-      // Large plant between desks (2×3)
-      ...mt('interiors', 10, 44, 2, 3, 7, 5),
+      // Green plant between desks (2×2)
+      ...mt('interiors', 10, 44, 2, 2, 7, 5),
       // Character at right desk
       { tile: CHAR_SIT, x: 11, y: 7 },
       // Subtle green glow
@@ -229,24 +223,21 @@ const SCENES = {
     width: 16, height: 12,
     caption: 'The perfect Saturday morning.',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_CREAM, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_WARM_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_WARM_B, x: 0, y: 2, w: 16, h: 2 },
-      // Large window
-      ...mt('interiors', 0, 28, 4, 2, 1, 1),
-      // Cafe counter (2×2)
-      ...mt('interiors', 0, 55, 2, 2, 12, 4),
-      // Wood table (3×2)
-      ...mt('interiors', 0, 10, 3, 2, 5, 6),
-      // Chairs at table
-      { tile: { s: 'interiors', c: 3, r: 31 }, x: 5, y: 8 },
-      { tile: { s: 'interiors', c: 4, r: 31 }, x: 7, y: 8 },
-      // Small potted plant
-      { tile: { s: 'interiors', c: 0, r: 49 }, x: 14, y: 7 },
-      // Another table (back of shop)
-      ...mt('interiors', 0, 10, 3, 2, 9, 8),
-      // Character sitting at main table
-      { tile: CHAR_SIT, x: 6, y: 7 },
+      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_SALMON_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_SALMON_B, x: 0, y: 2, w: 16, h: 2 },
+      // Curtained window (2×2)
+      ...mt('interiors', 4, 24, 2, 2, 1, 2),
+      // Red 4-pane window (2×2)
+      ...mt('interiors', 7, 24, 2, 2, 5, 2),
+      // Cabinet with windows (2×2) — looks like a counter
+      ...mt('interiors', 11, 24, 2, 2, 12, 4),
+      // Wide table — main seating (3×2)
+      ...mt('interiors', 7, 10, 3, 2, 5, 7),
+      // Small brown table — back (2×2)
+      ...mt('interiors', 0, 10, 2, 2, 11, 8),
+      // Character sitting at table
+      { tile: CHAR_SIT, x: 6, y: 9 },
       // Warm cafe glow
       { type: 'fill', color: 'rgba(210,153,34,0.06)', x: 0, y: 0, w: 16, h: 12 },
     ]
@@ -256,22 +247,21 @@ const SCENES = {
     width: 16, height: 12,
     caption: 'No laptops allowed.',
     layers: [
-      // Sky
-      { type: 'fill', color: '#87ceeb', x: 0, y: 0, w: 16, h: 5 },
+      // Sky gradient
+      { type: 'fill', color: '#7ec8e3', x: 0, y: 0, w: 16, h: 3 },
+      { type: 'fill', color: '#87ceeb', x: 0, y: 3, w: 16, h: 2 },
       // Sun
       { type: 'fill', color: '#f0e68c', x: 12, y: 1, w: 2, h: 2 },
-      { type: 'fill', color: '#f0883e', x: 13, y: 2, w: 1, h: 1 },
       // Water
       { type: 'fill', color: '#4a90d9', x: 0, y: 5, w: 16, h: 2 },
-      { type: 'fill', color: '#58a6ff', x: 2, y: 5, w: 1, h: 1 },
-      { type: 'fill', color: '#58a6ff', x: 8, y: 6, w: 1, h: 1 },
-      { type: 'fill', color: '#e6edf3', x: 5, y: 5, w: 1, h: 1 },
+      { type: 'fill', color: '#58a6ff', x: 2, y: 5, w: 2, h: 1 },
+      { type: 'fill', color: '#3d7fc2', x: 8, y: 6, w: 3, h: 1 },
       // Sand
       { type: 'fill', color: '#d2c290', x: 0, y: 7, w: 16, h: 5 },
       { type: 'fill', color: '#c2b280', x: 0, y: 7, w: 16, h: 1 },
-      // Palm tree (2×3)
-      ...mt('interiors', 12, 44, 2, 3, 2, 4),
-      // Beach blanket (fill)
+      // Palm tree (2×2)
+      ...mt('interiors', 12, 44, 2, 2, 2, 6),
+      // Beach blanket
       { type: 'fill', color: '#f85149', x: 9, y: 9, w: 3, h: 1 },
       { type: 'fill', color: '#58a6ff', x: 9, y: 10, w: 3, h: 1 },
       // Character on beach
@@ -286,24 +276,20 @@ const SCENES = {
       { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
       { type: 'tile-fill', tile: T.WALL_MINT_T, x: 0, y: 0, w: 16, h: 2 },
       { type: 'tile-fill', tile: T.WALL_MINT_B, x: 0, y: 2, w: 16, h: 2 },
-      // Window
-      ...mt('interiors', 0, 26, 2, 2, 7, 1),
-      // Bookshelf (2×4)
-      ...mt('interiors', 4, 14, 2, 4, 12, 4),
-      // Desk with book (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 6, 6),
-      // Computer tower
+      // Red 4-pane window on wall (2×2)
+      ...mt('interiors', 7, 24, 2, 2, 7, 2),
+      // Colorful bookshelf (2×2)
+      ...mt('interiors', 5, 14, 2, 2, 12, 4),
+      // Globe on stand (1×2)
+      ...mt('interiors', 14, 35, 1, 2, 2, 5),
+      // Desk (2×2)
+      ...mt('interiors', 5, 10, 2, 2, 6, 6),
+      // Computer tower (1×2)
       ...mt('interiors', 12, 40, 1, 2, 8, 6),
-      // Chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 7, y: 8 },
-      // Character celebrating
-      { tile: CHAR_IDLE, x: 4, y: 7 },
+      // Character celebrating (standing)
+      { tile: CHAR_IDLE, x: 4, y: 8 },
       // Money-green glow
-      { type: 'fill', color: 'rgba(63,185,80,0.12)', x: 0, y: 0, w: 16, h: 12 },
-      // Gold sparkles
-      { type: 'fill', color: '#d29922', x: 3, y: 2, w: 1, h: 1 },
-      { type: 'fill', color: '#d29922', x: 11, y: 1, w: 1, h: 1 },
-      { type: 'fill', color: '#3fb950', x: 9, y: 3, w: 1, h: 1 },
+      { type: 'fill', color: 'rgba(63,185,80,0.1)', x: 0, y: 0, w: 16, h: 12 },
     ]
   },
 
@@ -311,20 +297,20 @@ const SCENES = {
     width: 16, height: 12,
     caption: 'Is this what rested feels like?',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
       { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
       { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
       // Sunrise glow behind window
-      { type: 'fill', color: '#f0e68c', x: 6, y: 0, w: 5, h: 3 },
-      // Wide window (4×2)
-      ...mt('interiors', 0, 28, 4, 2, 6, 1),
+      { type: 'fill', color: '#f0e68c', x: 6, y: 0, w: 5, h: 4 },
+      // Large modern window (3×2)
+      ...mt('interiors', 0, 28, 3, 2, 6, 2),
       // Green bed (3×4)
       ...mt('interiors', 0, 0, 3, 4, 1, 4),
-      // Nightstand
-      { tile: { s: 'interiors', c: 3, r: 6 }, x: 4, y: 6 },
-      // Potted plant (2×3)
-      ...mt('interiors', 10, 44, 2, 3, 13, 5),
-      // Character (just woke up)
+      // Nightstand with lamp (1×2)
+      ...mt('interiors', 3, 3, 1, 2, 4, 6),
+      // Green bushy plant (2×2)
+      ...mt('interiors', 10, 44, 2, 2, 13, 5),
+      // Character just woke up (standing)
       { tile: CHAR_IDLE, x: 10, y: 7 },
       // Warm morning light
       { type: 'fill', color: 'rgba(240,230,140,0.1)', x: 0, y: 0, w: 16, h: 12 },
@@ -335,28 +321,27 @@ const SCENES = {
     width: 16, height: 12,
     caption: 'The Builder.',
     layers: [
-      { type: 'tile-fill', tile: T.FLOOR_WOOD, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_WHITE_B, x: 0, y: 2, w: 16, h: 2 },
-      // Paintings on wall
-      ...mt('interiors', 0, 13, 2, 1, 2, 2),
-      ...mt('interiors', 3, 14, 2, 1, 12, 2),
+      { type: 'tile-fill', tile: T.FLOOR_HERRING, x: 0, y: 0, w: 16, h: 12 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
+      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
+      // Large framed painting (2×2)
+      ...mt('interiors', 7, 28, 2, 2, 2, 2),
+      // Curtained window (2×2)
+      ...mt('interiors', 4, 24, 2, 2, 7, 2),
+      // Red 4-pane window (2×2)
+      ...mt('interiors', 7, 24, 2, 2, 12, 2),
+      // Wide bookshelf against wall (3×2)
+      ...mt('interiors', 7, 14, 3, 2, 0, 4),
       // Globe on stand (1×2)
-      ...mt('interiors', 14, 36, 1, 2, 10, 5),
-      // Bookshelf left (2×4)
-      ...mt('interiors', 4, 14, 2, 4, 0, 4),
-      // Center desk (2×2)
-      ...mt('interiors', 5, 36, 2, 2, 6, 6),
-      // Computer tower
-      ...mt('interiors', 12, 40, 1, 2, 8, 6),
-      // Chair
-      { tile: { s: 'interiors', c: 3, r: 32 }, x: 7, y: 8 },
-      // Large plant (2×3)
-      ...mt('interiors', 10, 44, 2, 3, 13, 5),
-      // Palm tree (2×3)
-      ...mt('interiors', 12, 44, 2, 3, 3, 5),
-      // Standing lamp (1×2)
-      ...mt('interiors', 11, 52, 1, 2, 15, 5),
+      ...mt('interiors', 14, 35, 1, 2, 5, 5),
+      // Desk (2×2)
+      ...mt('interiors', 5, 10, 2, 2, 7, 6),
+      // Computer tower (1×2)
+      ...mt('interiors', 12, 40, 1, 2, 9, 6),
+      // Palm tree (2×2)
+      ...mt('interiors', 12, 44, 2, 2, 13, 5),
+      // Green plant (2×2)
+      ...mt('interiors', 10, 44, 2, 2, 14, 8),
       // Character (triumphant)
       { tile: CHAR_IDLE, x: 5, y: 7 },
       // Golden glow
@@ -388,9 +373,9 @@ function drawCharacterTile(ctx, token, x, y) {
   };
   const sheet = sheetImages[poseMap[token]];
   if (!sheet || !sheet.complete) return;
-  // Character sprite: 1 tile wide × 2 tiles tall (16×32), first frame
+  // Character sprites are 16×32px, scale 3x to fill 48×96 (1×2 tiles)
   ctx.drawImage(sheet,
-    0, 0, TILE_SIZE, TILE_SIZE * 2,
+    0, 0, 16, 32,
     x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE * 2
   );
 }
