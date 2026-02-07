@@ -4,6 +4,7 @@
 
 // --- Constants ---
 const TOTAL_WEEKS = 26;
+const APPS_TO_SHIP = 3;
 const WEEKLY_INCOME = 4000;
 const WEEKLY_EXPENSES = 3500;
 const WEEKLY_ENERGY_DRAIN = 4;
@@ -134,7 +135,7 @@ function renderIntro() {
         <p class="intro-line" style="animation-delay: 0.8s">You are a PM at BigTechCo.</p>
         <p class="intro-line" style="animation-delay: 1.4s">You've been shipping PRDs, running sprints, and sitting through all-hands meetings for years.</p>
         <p class="intro-line" style="animation-delay: 2.2s">One night, you open a code editor.</p>
-        <p class="intro-line dim" style="animation-delay: 3.2s">You have 26 weeks. Ship apps. Don't burn out.</p>
+        <p class="intro-line dim" style="animation-delay: 3.2s">You have 26 weeks. Ship 3 apps. Don't burn out. Don't lose your family.</p>
       </div>
       <button class="btn-primary intro-line" style="animation-delay: 4.0s" onclick="renderNameCharacterSelect()">
         <span class="btn-key">Enter</span> Begin
@@ -309,7 +310,8 @@ function renderHUD() {
       </div>
       <div class="resource-row">
         <span class="resource-label">SHIPPED</span>
-        <span class="resource-value">${state.appsShipped} app${state.appsShipped !== 1 ? 's' : ''}</span>
+        <span class="resource-bar">${makeBar(state.appsShipped, APPS_TO_SHIP, 10)}</span>
+        <span class="resource-value">${state.appsShipped} / ${APPS_TO_SHIP}</span>
       </div>
       ${projectHTML}
         </div>
@@ -708,7 +710,14 @@ function nextWeek() {
     return;
   }
 
-  // Check if year is complete
+  // Check if goal reached (shipped enough apps)
+  if (state.appsShipped >= APPS_TO_SHIP) {
+    state.phase = 'ending';
+    renderEnding();
+    return;
+  }
+
+  // Check if time is up
   if (state.week > TOTAL_WEEKS) {
     state.phase = 'ending';
     renderEnding();
@@ -808,7 +817,9 @@ function checkGameOver() {
 }
 
 function getEnding() {
-  // Lose conditions
+  const fs = state.familyScore;
+
+  // Lose conditions — broke, burnout, lost thread
   if (state.savings <= 0) {
     return { isWin: false, title: 'Broke', sceneId: 'burnout',
       description: "The money ran out. Rent, daycare, API bills — it adds up fast in the Bay Area. The dream isn't dead, but the runway is." };
@@ -822,33 +833,23 @@ function getEnding() {
       description: "Five weeks without touching code. The editor gathers dust. You meant to get back to it. You always meant to." };
   }
 
-  // Win conditions — success × family matrix
-  const successScore = state.appsShipped * 10 + (state.totalPassiveIncome / 50);
-  const fs = state.familyScore;
-
-  if (successScore >= 30) {
+  // Win — shipped enough apps
+  if (state.appsShipped >= APPS_TO_SHIP) {
     if (fs >= 3) return { isWin: true, title: 'Sustainable Builder', sceneId: 'ending-builder',
-      description: "You shipped real products AND stayed present for your family. The rarest ending. You proved it doesn't have to be either/or." };
+      description: `${APPS_TO_SHIP} apps shipped AND your family is intact. You proved it doesn't have to be either/or. The rarest kind of builder.` };
     if (fs <= -3) return { isWin: true, title: 'The Workaholic', sceneId: 'late-night',
-      description: "You shipped everything. But at what cost? Your kid's drawings show you holding a laptop. Your spouse stopped asking about your day." };
+      description: `You shipped ${APPS_TO_SHIP} apps. But at what cost? Your kid's drawings show you holding a laptop. Your spouse stopped asking about your day.` };
     return { isWin: true, title: 'The Builder', sceneId: 'ending-builder',
-      description: "Apps shipped, income flowing. You're not a PM who codes — you're a builder. The family stuff... you'll figure that out next." };
+      description: `${APPS_TO_SHIP} apps shipped. You're not a PM who codes — you're a builder who happens to have a day job. For now.` };
   }
-  if (successScore >= 15) {
-    if (fs >= 3) return { isWin: true, title: 'Present Parent', sceneId: 'family',
-      description: "You didn't ship the most, but your family never doubted you were there. And you still built something real. That's enough." };
-    if (fs <= -3) return { isWin: true, title: 'The Grinder', sceneId: 'burnout',
-      description: "You shipped some things. Missed some things. Your spouse says 'we need to talk' and you know it's not about the code." };
-    return { isWin: true, title: 'The Shipper', sceneId: 'flow-state',
-      description: "Not everything worked, but you shipped. Most people talk about building. You actually did it." };
-  }
-  // Low success
-  if (fs >= 3) return { isWin: true, title: 'The Good Parent', sceneId: 'family',
-    description: "You chose your family over the grind. Not much shipped, but your kid's drawing now shows you holding their hand." };
+
+  // Ran out of time — didn't ship enough
+  if (fs >= 3) return { isWin: false, title: 'The Good Parent', sceneId: 'family',
+    description: "You chose your family over the grind. Not enough shipped, but your kid's drawing shows you holding their hand. Maybe that's its own kind of win." };
   if (fs <= -3) return { isWin: false, title: 'Lost in the Grind', sceneId: 'burnout',
-    description: "You sacrificed family time but didn't ship much either. The worst of both worlds. Time to reset." };
+    description: "You sacrificed family time but didn't ship enough either. The worst of both worlds. Time to reset." };
   return { isWin: false, title: 'The Tinkerer', sceneId: 'late-night',
-    description: "You tinkered. You learned. You didn't quite ship or quite show up. But the seed is planted." };
+    description: `Time's up. ${state.appsShipped} app${state.appsShipped !== 1 ? 's' : ''} shipped, needed ${APPS_TO_SHIP}. You learned a lot. Maybe next time.` };
 }
 
 // ========================================
