@@ -51,7 +51,7 @@ const SCENES = {
 
   'ship': {
     width: SCENE_W, height: SCENE_H,
-    caption: '{name} shipped something real.',
+    caption: 'You shipped something real.',
     draw(ctx, w, h) {
       ctx.fillStyle = '#0a192f';
       ctx.fillRect(0, 0, w, h);
@@ -266,7 +266,7 @@ const SCENES = {
 
   'payday': {
     width: SCENE_W, height: SCENE_H,
-    caption: '{name}\'s first dollar.',
+    caption: 'Your first dollar.',
     draw(ctx, w, h) {
       ctx.fillStyle = '#081a0a';
       ctx.fillRect(0, 0, w, h);
@@ -343,7 +343,7 @@ const SCENES = {
 
   'burnout': {
     width: SCENE_W, height: SCENE_H,
-    caption: '{name} pushed too hard.',
+    caption: 'You pushed too hard.',
     draw(ctx, w, h) {
       ctx.fillStyle = '#0d0d0d';
       ctx.fillRect(0, 0, w, h);
