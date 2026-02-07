@@ -917,7 +917,7 @@ function showSceneOverlay(sceneId, callback) {
     <div class="scene-card">
       ${renderPixelArt(sceneId)}
       <div class="scene-caption">${personalize(scene.caption)}</div>
-      <div class="scene-dismiss dim">Press any key or tap to continue</div>
+      <div class="scene-dismiss dim">Press Enter or tap to continue</div>
     </div>
   `;
   hydrateScenes(overlay);
@@ -926,13 +926,17 @@ function showSceneOverlay(sceneId, callback) {
   const dismiss = () => {
     overlay.classList.add('hidden');
     overlay.innerHTML = '';
-    document.removeEventListener('keydown', dismiss);
+    document.removeEventListener('keydown', onKey);
     overlay.removeEventListener('click', dismiss);
     if (callback) callback();
   };
 
+  const onKey = (e) => {
+    if (e.key === 'Enter') dismiss();
+  };
+
   setTimeout(() => {
-    document.addEventListener('keydown', dismiss, { once: true });
+    document.addEventListener('keydown', onKey);
     overlay.addEventListener('click', dismiss, { once: true });
   }, 300);
 }
