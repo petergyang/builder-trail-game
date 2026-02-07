@@ -596,6 +596,8 @@ body {
   border: 2px solid #30363d;
   box-shadow: 0 0 40px rgba(88, 166, 255, 0.15), 0 0 80px rgba(88, 166, 255, 0.05);
   image-rendering: pixelated;
+  max-width: 90vw;
+  height: auto;
 }
 
 .scene-caption {

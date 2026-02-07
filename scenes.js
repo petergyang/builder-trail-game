@@ -1,424 +1,423 @@
 // ========================================
-// THE BUILDER TRAIL — Tile-Based Pixel Art Scenes
+// THE BUILDER TRAIL — Iconic Scene Art
 // ========================================
-// Uses LimeZu "Modern tiles_Free" sprite sheets (48×48 variant)
-// Tile coords: (col, row) 0-indexed, 48×48px per tile
+// Each scene: dark background + one centered pixel art icon
+// No tilesheets — everything drawn programmatically
 
-const TILE_SIZE = 48;
+const TILE_SIZE = 1;     // pixel-based (kept for API compat)
 const SCENE_SCALE = 1;
 
-// ── Sprite Sheet Loading ──
+const SCENE_W = 480;
+const SCENE_H = 320;
 
-const SPRITE_SHEETS = {
-  interiors: 'assets/Interiors_free_48x48.png',
-  rooms: 'assets/Room_Builder_free_48x48.png'
-};
+// ── Stubs for API compatibility (game.js calls these) ──
 
 const sheetImages = {};
 const sceneCache = {};
 
-function preloadSheets() {
-  Object.entries(SPRITE_SHEETS).forEach(([key, src]) => {
-    const img = new Image();
-    img.src = src;
-    sheetImages[key] = img;
-  });
-}
-
-function loadCharacterTiles(charName) {
-  ['idle', 'sit2', 'phone'].forEach(pose => {
-    const img = new Image();
-    img.src = `assets/${charName}_${pose}_16x16.png`;
-    sheetImages['char_' + pose] = img;
-  });
-  clearSceneCache();
-}
-
+function preloadSheets() {}
+function loadCharacterTiles() { clearSceneCache(); }
 function clearSceneCache() {
   for (const k of Object.keys(sceneCache)) delete sceneCache[k];
 }
 
-// ── Tile Definitions ──
-// Room_Builder walls: paired rows (top=crown, bot=baseboard)
-// Use col 5 for smooth mid-fill (col 4 has seam edges that create bars)
+// ── Drawing Helpers ──
 
-const T = {
-  // Walls (col 5 — seamless fill)
-  WALL_SALMON_T:   { s: 'rooms', c: 5, r: 5 },
-  WALL_SALMON_B:   { s: 'rooms', c: 5, r: 6 },
-  WALL_CREAM_T:    { s: 'rooms', c: 5, r: 7 },
-  WALL_CREAM_B:    { s: 'rooms', c: 5, r: 8 },
-  WALL_MINT_T:     { s: 'rooms', c: 5, r: 9 },
-  WALL_MINT_B:     { s: 'rooms', c: 5, r: 10 },
-  WALL_WOOD_T:     { s: 'rooms', c: 5, r: 11 },
-  WALL_WOOD_B:     { s: 'rooms', c: 5, r: 12 },
-  WALL_BLUEGRAY_T: { s: 'rooms', c: 5, r: 17 },
-  WALL_BLUEGRAY_B: { s: 'rooms', c: 5, r: 18 },
-  WALL_DKBLUE_T:   { s: 'rooms', c: 5, r: 19 },
-  WALL_DKBLUE_B:   { s: 'rooms', c: 5, r: 20 },
-
-  // Floors (right side of Room_Builder)
-  FLOOR_YELLOW:   { s: 'rooms', c: 11, r: 7 },
-  FLOOR_GRAY:     { s: 'rooms', c: 11, r: 11 },
-  FLOOR_HERRING:  { s: 'rooms', c: 11, r: 13 },
-};
-
-// Character sentinels
-const CHAR_SIT = '__CHARACTER_SIT__';
-const CHAR_IDLE = '__CHARACTER_IDLE__';
-
-// Helper: multi-tile layer entries
-function mt(sheet, sc, sr, w, h, dx, dy) {
-  const out = [];
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++)
-      out.push({ tile: { s: sheet, c: sc + x, r: sr + y }, x: dx + x, y: dy + y });
-  return out;
+function drawPixels(ctx, grid, palette, cx, cy, px) {
+  const rows = grid.length, cols = grid[0].length;
+  const ox = Math.round(cx - cols * px / 2);
+  const oy = Math.round(cy - rows * px / 2);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = grid[r][c];
+      if (ch === '.') continue;
+      ctx.fillStyle = palette[ch];
+      ctx.fillRect(ox + c * px, oy + r * px, px, px);
+    }
+  }
 }
 
-// Shorthand for single interiors tile
-function it(c, r, x, y) {
-  return { tile: { s: 'interiors', c, r }, x, y };
+function glow(ctx, x, y, radius, color) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  g.addColorStop(0, color);
+  g.addColorStop(1, 'transparent');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 }
 
 // ── Scene Definitions ──
-// 16 wide × 12 tall | Rows 0-1: wall top | Rows 2-3: wall bottom | Rows 4-11: floor
 
 const SCENES = {
 
   'ship': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: '{name} shipped something real.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall decorations
-      ...mt('interiors', 4, 24, 2, 2, 2, 2),    // curtain window
-      ...mt('interiors', 7, 24, 2, 2, 7, 2),     // red 4-pane window
-      ...mt('interiors', 9, 66, 2, 2, 12, 2),    // world map
-      it(1, 70, 5, 3),                            // small painting
-      // Furniture against wall
-      ...mt('interiors', 5, 14, 2, 2, 0, 4),     // colorful bookshelf
-      ...mt('interiors', 12, 68, 2, 2, 14, 4),   // brown bookshelf
-      ...mt('interiors', 10, 44, 2, 2, 11, 5),   // green plant
-      ...mt('interiors', 14, 35, 1, 2, 4, 5),    // globe
-      it(0, 66, 3, 6),                            // small pot
-      // Desk area
-      ...mt('interiors', 5, 35, 2, 2, 6, 6),     // desk with book
-      ...mt('interiors', 12, 40, 1, 2, 8, 6),    // computer tower
-      // Character sitting at desk
-      { tile: CHAR_SIT, x: 7, y: 7 },
-      // Celebration glow
-      { type: 'fill', color: 'rgba(63,185,80,0.07)', x: 0, y: 0, w: 16, h: 12 },
-    ]
-  },
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#0a192f';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.5, 180, 'rgba(63,185,80,0.18)');
 
-  'burnout': {
-    width: 16, height: 12,
-    caption: '{name} pushed too hard.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_WOOD_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_WOOD_B, x: 0, y: 2, w: 16, h: 2 },
-      // Sparse, dark room
-      it(0, 70, 7, 3),                            // lonely painting
-      // Desk area
-      ...mt('interiors', 5, 35, 2, 2, 6, 6),     // desk with book
-      ...mt('interiors', 12, 40, 1, 2, 8, 6),    // computer tower
-      it(0, 68, 13, 8),                            // lonely pot
-      // Character slumped at desk
-      { tile: CHAR_SIT, x: 7, y: 7 },
-      // Darkness
-      { type: 'fill', color: 'rgba(0,0,0,0.45)', x: 0, y: 0, w: 16, h: 12 },
-      // Dim red glow from screen
-      { type: 'fill', color: 'rgba(248,81,73,0.18)', x: 5, y: 5, w: 5, h: 4 },
-    ]
-  },
+      drawPixels(ctx, [
+        '....WW....',
+        '...WWWW...',
+        '...WWWW...',
+        '..WWWWWW..',
+        '..WCCCWW..',
+        '..WCCCWW..',
+        '..WWWWWW..',
+        '.WWWWWWWW.',
+        '.WWWWWWWW.',
+        'RWWWWWWWWR',
+        'RR.WWWW.RR',
+        '....OO....',
+        '...OOYY...',
+        '....YY....',
+      ], {
+        W: '#e6edf3', C: '#58a6ff', R: '#f85149',
+        O: '#f0883e', Y: '#d29922'
+      }, w / 2, h * 0.42, 14);
 
-  'family': {
-    width: 16, height: 12,
-    caption: 'Some things matter more than code.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_HERRING, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall decorations
-      ...mt('interiors', 7, 28, 2, 2, 3, 2),     // framed painting
-      ...mt('interiors', 4, 24, 2, 2, 8, 2),     // curtain window
-      it(2, 70, 13, 3),                            // art painting
-      // Furniture
-      ...mt('interiors', 4, 68, 2, 2, 12, 4),    // fireplace
-      ...mt('interiors', 10, 44, 2, 2, 0, 5),    // green plant
-      ...mt('interiors', 7, 16, 3, 2, 5, 8),     // red/gold rug
-      ...mt('interiors', 1, 72, 3, 2, 5, 6),     // gray sofa (3 wide!)
-      ...mt('interiors', 0, 10, 2, 2, 2, 7),     // small table
-      it(0, 66, 14, 6),                            // pot plant
-      it(0, 66, 15, 8),                            // pot plant
-      // Character standing
-      { tile: CHAR_IDLE, x: 10, y: 7 },
-    ]
+      ctx.fillStyle = 'rgba(230,237,243,0.35)';
+      [[80, 50], [400, 35], [55, 200], [425, 175], [150, 275],
+       [350, 260], [200, 28], [310, 285], [440, 90], [30, 130]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 3, 3);
+      });
+    }
   },
 
   'late-night': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: '2:47 AM. It works.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_DKBLUE_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_DKBLUE_B, x: 0, y: 2, w: 16, h: 2 },
-      // Night sky behind window
-      { type: 'fill', color: '#0a0a2e', x: 10, y: 1, w: 4, h: 3 },
-      // Large modern window (3×2)
-      ...mt('interiors', 0, 28, 3, 2, 10, 2),
-      // Moon
-      { type: 'fill', color: '#c8d0d8', x: 12, y: 1, w: 1, h: 1 },
-      it(1, 70, 4, 3),                            // painting on wall
-      // Furniture
-      ...mt('interiors', 12, 68, 2, 2, 0, 4),    // brown bookshelf
-      ...mt('interiors', 10, 44, 2, 2, 14, 4),   // green plant
-      it(0, 66, 3, 6),                            // pot
-      // Desk area
-      ...mt('interiors', 5, 35, 2, 2, 5, 6),     // desk with book
-      ...mt('interiors', 12, 40, 1, 2, 7, 6),    // computer tower
-      // Character sitting
-      { tile: CHAR_SIT, x: 6, y: 7 },
-      // Dark night overlay
-      { type: 'fill', color: 'rgba(0,0,20,0.45)', x: 0, y: 0, w: 16, h: 12 },
-      // Monitor glow
-      { type: 'fill', color: 'rgba(88,166,255,0.2)', x: 4, y: 5, w: 5, h: 5 },
-    ]
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#070b1a';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w * 0.62, h * 0.35, 180, 'rgba(240,230,140,0.06)');
+
+      drawPixels(ctx, [
+        '..YYY....',
+        '.YYYYY...',
+        'YYYYY....',
+        'YYYY.....',
+        'YYYY.....',
+        'YYYY.....',
+        'YYYY.....',
+        'YYYYY....',
+        '.YYYYY...',
+        '..YYY....',
+      ], { Y: '#f0e68c' }, w * 0.62, h * 0.35, 16);
+
+      ctx.fillStyle = '#e6edf3';
+      [[60, 40], [120, 100], [400, 55], [200, 50], [100, 220],
+       [350, 150], [440, 240], [80, 165], [300, 30], [175, 270],
+       [420, 120], [260, 280], [35, 275], [455, 50]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 3, 3);
+      });
+      ctx.fillStyle = '#58a6ff';
+      [[150, 80], [380, 200], [50, 260], [330, 45]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 4, 4);
+      });
+
+      glow(ctx, w * 0.35, h * 0.85, 100, 'rgba(88,166,255,0.12)');
+    }
+  },
+
+  'family': {
+    width: SCENE_W, height: SCENE_H,
+    caption: 'Some things matter more than code.',
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#1a0f08';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.42, 200, 'rgba(248,81,73,0.12)');
+
+      drawPixels(ctx, [
+        '..RRR...RRR..',
+        '.RRRRR.RRRRR.',
+        'RRRRRRRRRRRRR',
+        'RRRRRRRRRRRRR',
+        'RRRRRRRRRRRRR',
+        '.RRRRRRRRRRR.',
+        '..RRRRRRRRR..',
+        '...RRRRRRR...',
+        '....RRRRR....',
+        '.....RRR.....',
+        '......R......',
+      ], { R: '#f85149' }, w / 2, h * 0.42, 16);
+
+      ctx.fillStyle = 'rgba(248,81,73,0.25)';
+      [[100, 80], [380, 95], [75, 250], [405, 230],
+       [200, 275], [320, 55]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 4, 4);
+      });
+    }
   },
 
   'flow-state': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: 'Everything clicks.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall items
-      ...mt('interiors', 9, 66, 2, 2, 6, 2),     // world map on wall
-      ...mt('interiors', 9, 24, 2, 2, 12, 2),    // frosted window
-      it(2, 70, 4, 3),                            // art painting
-      // Furniture against wall
-      ...mt('interiors', 5, 14, 2, 2, 0, 4),     // bookshelf
-      ...mt('interiors', 14, 68, 2, 2, 14, 4),   // red bookshelf
-      ...mt('interiors', 10, 44, 2, 2, 8, 5),    // green plant (center)
-      // Left desk
-      ...mt('interiors', 5, 35, 2, 2, 2, 6),
-      ...mt('interiors', 12, 40, 1, 2, 4, 6),
-      // Right desk
-      ...mt('interiors', 5, 35, 2, 2, 10, 6),
-      ...mt('interiors', 12, 40, 1, 2, 12, 6),
-      // Character at right desk
-      { tile: CHAR_SIT, x: 11, y: 7 },
-      // Subtle glow
-      { type: 'fill', color: 'rgba(63,185,80,0.06)', x: 0, y: 0, w: 16, h: 12 },
-    ]
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#0b1628';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.45, 180, 'rgba(210,153,34,0.15)');
+
+      drawPixels(ctx, [
+        '....YYYYY',
+        '...YYYYY.',
+        '..YYYYY..',
+        '.YYYYY...',
+        'YYYYYYYYY',
+        '.YYYYYYYY',
+        '.....YYYY',
+        '....YYYY.',
+        '...YYYY..',
+        '..YYYY...',
+        '.YYYY....',
+        'YYYY.....',
+      ], { Y: '#f0e68c' }, w / 2, h * 0.42, 14);
+
+      ctx.fillStyle = '#58a6ff';
+      [[175, 95], [305, 85], [145, 225], [345, 200],
+       [205, 270], [280, 50], [400, 145], [85, 155]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 3, 3);
+      });
+    }
   },
 
   'coffee-shop': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: 'The perfect Saturday morning.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_SALMON_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_SALMON_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall items
-      ...mt('interiors', 4, 24, 2, 2, 1, 2),     // curtain window
-      ...mt('interiors', 7, 24, 2, 2, 5, 2),     // red window
-      it(1, 70, 10, 3),                           // painting
-      it(2, 70, 14, 3),                           // painting
-      // Furniture
-      ...mt('interiors', 12, 72, 2, 2, 12, 4),   // store shelf (counter)
-      ...mt('interiors', 14, 72, 2, 2, 14, 6),   // store shelf
-      ...mt('interiors', 10, 44, 2, 2, 0, 5),    // plant
-      it(0, 66, 10, 6),                           // pot
-      // Seating area
-      ...mt('interiors', 7, 72, 3, 2, 0, 7),     // brown sofa bench
-      ...mt('interiors', 7, 10, 3, 2, 5, 7),     // wide table
-      ...mt('interiors', 0, 10, 2, 2, 10, 8),    // small table
-      // Character at table
-      { tile: CHAR_SIT, x: 6, y: 9 },
-      // Warm glow
-      { type: 'fill', color: 'rgba(210,153,34,0.06)', x: 0, y: 0, w: 16, h: 12 },
-    ]
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#1a0f08';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.5, 180, 'rgba(210,153,34,0.12)');
+
+      drawPixels(ctx, [
+        '..S..S..S..',
+        '...........',
+        '.BBBBBBBBB.',
+        '.BBBBBBBBBH',
+        '.BBBBBBBBBH',
+        '.BBBBBBBBBH',
+        '.BBBBBBBBB.',
+        '..BBBBBBB..',
+        '...........',
+        'PPPPPPPPPPP',
+        '.PPPPPPPPP.',
+      ], {
+        S: 'rgba(230,237,243,0.5)',
+        B: '#6e4b2a', H: '#5a3d22', P: '#8b949e'
+      }, w / 2, h * 0.42, 16);
+    }
   },
 
   'vacation': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: 'No laptops allowed.',
-    layers: [
-      // Sky
-      { type: 'fill', color: '#7ec8e3', x: 0, y: 0, w: 16, h: 3 },
-      { type: 'fill', color: '#87ceeb', x: 0, y: 3, w: 16, h: 2 },
+    draw(ctx, w, h) {
+      // Sky gradient
+      const sky = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+      sky.addColorStop(0, '#4a90d9');
+      sky.addColorStop(1, '#87ceeb');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, w, h * 0.5);
+
       // Sun
-      { type: 'fill', color: '#f0e68c', x: 12, y: 1, w: 2, h: 2 },
+      glow(ctx, w * 0.78, h * 0.15, 60, 'rgba(240,230,140,0.5)');
+      ctx.fillStyle = '#f0e68c';
+      ctx.fillRect(w * 0.78 - 18, h * 0.15 - 18, 36, 36);
+
       // Water
-      { type: 'fill', color: '#4a90d9', x: 0, y: 5, w: 16, h: 2 },
-      { type: 'fill', color: '#58a6ff', x: 2, y: 5, w: 2, h: 1 },
-      { type: 'fill', color: '#3d7fc2', x: 8, y: 6, w: 3, h: 1 },
+      ctx.fillStyle = '#3d7fc2';
+      ctx.fillRect(0, h * 0.5, w, h * 0.12);
+      ctx.fillStyle = '#58a6ff';
+      for (let x = 0; x < w; x += 55) {
+        ctx.fillRect(x + 10, h * 0.52, 28, 3);
+      }
+
       // Sand
-      { type: 'fill', color: '#d2c290', x: 0, y: 7, w: 16, h: 5 },
-      { type: 'fill', color: '#c2b280', x: 0, y: 7, w: 16, h: 1 },
-      // Palm tree (2×2)
-      ...mt('interiors', 12, 44, 2, 2, 2, 6),
-      // Second palm tree
-      ...mt('interiors', 12, 44, 2, 2, 12, 5),
-      // Beach blanket
-      { type: 'fill', color: '#f85149', x: 7, y: 9, w: 3, h: 1 },
-      { type: 'fill', color: '#58a6ff', x: 7, y: 10, w: 3, h: 1 },
-      // Character on beach
-      { tile: CHAR_IDLE, x: 6, y: 8 },
-    ]
+      ctx.fillStyle = '#d2c290';
+      ctx.fillRect(0, h * 0.62, w, h * 0.38);
+      ctx.fillStyle = '#c2b280';
+      ctx.fillRect(0, h * 0.62, w, 5);
+
+      // Palm tree
+      drawPixels(ctx, [
+        '.GGGGG.',
+        'GGGGGGG',
+        'GG.G.GG',
+        '...B...',
+        '...B...',
+        '...B...',
+        '...B...',
+        '...B...',
+      ], { G: '#2ea043', B: '#6e4b2a' }, w * 0.3, h * 0.58, 14);
+
+      // Second palm tree (smaller, farther)
+      drawPixels(ctx, [
+        '.GGG.',
+        'GGGGG',
+        'G.G.G',
+        '..B..',
+        '..B..',
+        '..B..',
+        '..B..',
+      ], { G: '#2ea043', B: '#6e4b2a' }, w * 0.72, h * 0.52, 10);
+    }
   },
 
   'payday': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: '{name}\'s first dollar.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_GRAY, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_MINT_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_MINT_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall items
-      ...mt('interiors', 7, 24, 2, 2, 7, 2),     // red window
-      ...mt('interiors', 7, 28, 2, 2, 12, 2),    // framed painting
-      it(2, 70, 4, 3),                            // art painting
-      it(1, 70, 5, 3),                            // cat painting
-      // Furniture
-      ...mt('interiors', 5, 14, 2, 2, 0, 4),     // bookshelf
-      ...mt('interiors', 12, 68, 2, 2, 14, 4),   // brown bookshelf
-      ...mt('interiors', 14, 35, 1, 2, 13, 6),   // globe
-      ...mt('interiors', 10, 44, 2, 2, 2, 5),    // green plant
-      it(0, 66, 12, 8),                           // pot
-      // Desk area
-      ...mt('interiors', 5, 35, 2, 2, 6, 6),     // desk with book
-      ...mt('interiors', 12, 40, 1, 2, 8, 6),    // computer tower
-      // Character celebrating
-      { tile: CHAR_IDLE, x: 4, y: 8 },
-      // Money-green glow
-      { type: 'fill', color: 'rgba(63,185,80,0.1)', x: 0, y: 0, w: 16, h: 12 },
-    ]
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#081a0a';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.45, 200, 'rgba(210,153,34,0.18)');
+
+      drawPixels(ctx, [
+        '...GGGGG...',
+        '..GGGGGGG..',
+        '.GGGGGGGGG.',
+        '.GGGGGGGGG.',
+        'GGGGGGGGGGG',
+        'GGGGGGGGGGG',
+        'GGGGGGGGGGG',
+        '.GGGGGGGGG.',
+        '.GGGGGGGGG.',
+        '..GGGGGGG..',
+        '...GGGGG...',
+      ], { G: '#d29922' }, w / 2, h * 0.42, 16);
+
+      // Inner highlight
+      glow(ctx, w / 2, h * 0.42, 50, 'rgba(240,230,140,0.25)');
+
+      ctx.fillStyle = '#f0e68c';
+      [[180, 95], [315, 80], [145, 240], [365, 220],
+       [240, 55], [275, 270], [100, 160], [395, 135]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 5, 5);
+      });
+    }
   },
 
   'sunrise': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: 'Is this what rested feels like?',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_YELLOW, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_CREAM_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_CREAM_B, x: 0, y: 2, w: 16, h: 2 },
-      // Sunrise glow behind window
-      { type: 'fill', color: '#f0e68c', x: 7, y: 0, w: 5, h: 4 },
-      // Window
-      ...mt('interiors', 0, 28, 3, 2, 7, 2),     // large modern window
-      it(0, 12, 13, 3),                           // landscape painting
-      // Furniture
-      ...mt('interiors', 0, 0, 3, 4, 1, 4),      // green bed (3×4)
-      ...mt('interiors', 3, 3, 1, 2, 4, 6),      // nightstand
-      ...mt('interiors', 10, 44, 2, 2, 13, 5),   // green plant
-      ...mt('interiors', 6, 67, 1, 2, 12, 5),    // standing mirror
-      it(0, 66, 0, 9),                            // pot
-      it(0, 66, 15, 9),                           // pot
-      // Character just woke up
-      { tile: CHAR_IDLE, x: 9, y: 7 },
-      // Morning light
-      { type: 'fill', color: 'rgba(240,230,140,0.08)', x: 0, y: 0, w: 16, h: 12 },
-    ]
+    draw(ctx, w, h) {
+      // Sky gradient: deep purple → warm orange
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, '#1a0a2e');
+      grad.addColorStop(0.4, '#3d1f5c');
+      grad.addColorStop(0.65, '#c46b3a');
+      grad.addColorStop(1, '#f0883e');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Sun semicircle at horizon
+      const sunY = h * 0.62;
+      glow(ctx, w / 2, sunY, 150, 'rgba(240,230,140,0.25)');
+      ctx.fillStyle = '#f0e68c';
+      const sunR = 55;
+      for (let dy = 0; dy <= sunR; dy += 3) {
+        const dx = Math.round(Math.sqrt(sunR * sunR - dy * dy));
+        ctx.fillRect(w / 2 - dx, sunY - dy, dx * 2, 3);
+      }
+
+      // Horizon line
+      ctx.fillStyle = 'rgba(240,230,140,0.2)';
+      ctx.fillRect(0, sunY, w, 2);
+
+      // Rays
+      ctx.fillStyle = 'rgba(240,230,140,0.06)';
+      ctx.fillRect(w / 2 - 2, h * 0.15, 4, h * 0.47);
+      ctx.fillRect(w / 2 - 80, sunY - 2, 160, 4);
+      // Diagonal rays
+      ctx.save();
+      ctx.translate(w / 2, sunY);
+      [30, -30, 60, -60].forEach(deg => {
+        ctx.save();
+        ctx.rotate(deg * Math.PI / 180);
+        ctx.fillRect(-2, -120, 4, 120);
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+  },
+
+  'burnout': {
+    width: SCENE_W, height: SCENE_H,
+    caption: '{name} pushed too hard.',
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#0d0d0d';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.45, 120, 'rgba(248,81,73,0.08)');
+
+      drawPixels(ctx, [
+        '.....DD.....',
+        'DDDDDDDDDDDD',
+        'DD........DD',
+        'DD........DD',
+        'DD.RR.....DD',
+        'DD.RR.....DD',
+        'DD........DD',
+        'DD........DD',
+        'DDDDDDDDDDDD',
+      ], { D: '#484f58', R: '#f85149' }, w / 2, h * 0.42, 16);
+
+      // Dim red warning tint
+      ctx.fillStyle = 'rgba(248,81,73,0.04)';
+      ctx.fillRect(0, 0, w, h);
+    }
   },
 
   'ending-builder': {
-    width: 16, height: 12,
+    width: SCENE_W, height: SCENE_H,
     caption: 'The Builder.',
-    layers: [
-      { type: 'tile-fill', tile: T.FLOOR_HERRING, x: 0, y: 0, w: 16, h: 12 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_T, x: 0, y: 0, w: 16, h: 2 },
-      { type: 'tile-fill', tile: T.WALL_BLUEGRAY_B, x: 0, y: 2, w: 16, h: 2 },
-      // Wall decorations
-      ...mt('interiors', 9, 66, 2, 2, 2, 2),     // world map
-      ...mt('interiors', 4, 24, 2, 2, 7, 2),     // curtain window
-      ...mt('interiors', 7, 24, 2, 2, 12, 2),    // red window
-      it(1, 70, 5, 3),                            // painting
-      // Furniture against walls
-      ...mt('interiors', 7, 14, 3, 2, 0, 4),     // wide bookshelf
-      ...mt('interiors', 12, 68, 2, 2, 14, 4),   // brown bookshelf
-      ...mt('interiors', 14, 35, 1, 2, 5, 5),    // globe
-      ...mt('interiors', 12, 44, 2, 2, 11, 5),   // palm tree
-      ...mt('interiors', 10, 44, 2, 2, 3, 6),    // green plant
-      it(0, 66, 13, 8),                           // pot
-      // Desk area
-      ...mt('interiors', 5, 35, 2, 2, 7, 6),     // desk with book
-      ...mt('interiors', 12, 40, 1, 2, 9, 6),    // computer tower
-      // Character triumphant
-      { tile: CHAR_IDLE, x: 6, y: 7 },
-      // Golden glow
-      { type: 'fill', color: 'rgba(210,153,34,0.07)', x: 0, y: 0, w: 16, h: 12 },
-    ]
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#1a1508';
+      ctx.fillRect(0, 0, w, h);
+      glow(ctx, w / 2, h * 0.42, 200, 'rgba(210,153,34,0.2)');
+
+      drawPixels(ctx, [
+        'H.GGGGGGG.H',
+        'HH.GGGGG.HH',
+        'HH.GGGGG.HH',
+        '.GGGGGGGGG.',
+        '.GGGGGGGGG.',
+        '..GGGGGGG..',
+        '...GGGGG...',
+        '....GGG....',
+        '....GGG....',
+        '...GGGGG...',
+        '..GGGGGGG..',
+        '.GGGGGGGGG.',
+      ], { G: '#d29922', H: '#b08018' }, w / 2, h * 0.40, 14);
+
+      ctx.fillStyle = '#f0e68c';
+      [[140, 65], [350, 55], [95, 220], [405, 200], [230, 45],
+       [275, 275], [175, 270], [345, 260]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 5, 5);
+      });
+      ctx.fillStyle = '#e6edf3';
+      [[200, 90], [310, 115], [155, 190], [385, 155]].forEach(([sx, sy]) => {
+        ctx.fillRect(sx, sy, 3, 3);
+      });
+    }
   }
 };
 
 // ── Rendering Engine ──
-
-function drawTile(ctx, tile, x, y) {
-  if (typeof tile === 'string' && tile.startsWith('__CHARACTER_')) {
-    drawCharacterTile(ctx, tile, x, y);
-    return;
-  }
-  const sheet = sheetImages[tile.s];
-  if (!sheet || !sheet.complete) return;
-  ctx.drawImage(sheet,
-    tile.c * TILE_SIZE, tile.r * TILE_SIZE, TILE_SIZE, TILE_SIZE,
-    x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE
-  );
-}
-
-function drawCharacterTile(ctx, token, x, y) {
-  const poseMap = {
-    '__CHARACTER_SIT__': 'char_sit2',
-    '__CHARACTER_IDLE__': 'char_idle',
-    '__CHARACTER_PHONE__': 'char_phone',
-  };
-  const sheet = sheetImages[poseMap[token]];
-  if (!sheet || !sheet.complete) return;
-  // Character sprites are 16×32px, scale 3x to fill 48×96 (1×2 tiles)
-  ctx.drawImage(sheet,
-    0, 0, 16, 32,
-    x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE * 2
-  );
-}
-
-function drawTileFill(ctx, tile, x, y, w, h) {
-  for (let ty = y; ty < y + h; ty++)
-    for (let tx = x; tx < x + w; tx++)
-      drawTile(ctx, tile, tx, ty);
-}
 
 function renderSceneToCanvas(sceneId) {
   const scene = SCENES[sceneId];
   if (!scene) return null;
 
   const canvas = document.createElement('canvas');
-  canvas.width = scene.width * TILE_SIZE;
-  canvas.height = scene.height * TILE_SIZE;
+  canvas.width = scene.width;
+  canvas.height = scene.height;
   canvas.className = 'pixel-scene';
 
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
-  for (const layer of scene.layers) {
-    if (layer.type === 'fill') {
-      ctx.fillStyle = layer.color;
-      ctx.fillRect(
-        layer.x * TILE_SIZE, layer.y * TILE_SIZE,
-        layer.w * TILE_SIZE, layer.h * TILE_SIZE
-      );
-    } else if (layer.type === 'tile-fill') {
-      drawTileFill(ctx, layer.tile, layer.x, layer.y, layer.w, layer.h);
-    } else if (layer.tile) {
-      drawTile(ctx, layer.tile, layer.x, layer.y);
-    }
-  }
+  scene.draw(ctx, scene.width, scene.height);
 
   return canvas;
 }
