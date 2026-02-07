@@ -3,13 +3,13 @@
 // ========================================
 
 // --- Constants ---
-const TOTAL_WEEKS = 52;
+const TOTAL_WEEKS = 26;
 const WEEKLY_INCOME = 4000;
-const WEEKLY_EXPENSES = 1500;
-const WEEKLY_ENERGY_DRAIN = 3;
-const WEEKLY_MOMENTUM_DECAY = 3;
-const QUIET_WEEK_CHANCE = 0.12;
-const QUIET_WEEK_ENERGY = 15;
+const WEEKLY_EXPENSES = 3500;
+const WEEKLY_ENERGY_DRAIN = 4;
+const WEEKLY_MOMENTUM_DECAY = 4;
+const QUIET_WEEK_CHANCE = 0.08;
+const QUIET_WEEK_ENERGY = 12;
 
 // --- Tools ---
 const TOOLS = {
@@ -43,7 +43,7 @@ const TOOLS = {
     buildSpeedMod: 0.7,
     passiveIncomeMod: 0.7,
     momentumOnShip: 0,
-    ceilingWeeks: 4,
+    ceilingWeeks: 2,
     specialText: 'Fastest start, ceiling on big projects'
   },
   'replit': {
@@ -73,7 +73,7 @@ const TOOLS = {
 // --- State ---
 const state = {
   week: 0,
-  savings: 80000,
+  savings: 30000,
   energy: 100,
   momentum: 50,
   appsShipped: 0,
@@ -99,6 +99,7 @@ const state = {
   // M2: Hidden stats
   technicalSkill: 10,
   reputation: 30,
+  familyScore: 0,
 
   // M2: Inflection points
   firedInflections: [],
@@ -133,7 +134,7 @@ function renderIntro() {
         <p class="intro-line" style="animation-delay: 0.8s">You are a PM at BigTechCo.</p>
         <p class="intro-line" style="animation-delay: 1.4s">You've been shipping PRDs, running sprints, and sitting through all-hands meetings for years.</p>
         <p class="intro-line" style="animation-delay: 2.2s">One night, you open a code editor.</p>
-        <p class="intro-line dim" style="animation-delay: 3.2s">You have 52 weeks. Ship apps. Don't burn out.</p>
+        <p class="intro-line dim" style="animation-delay: 3.2s">You have 26 weeks. Ship apps. Don't burn out.</p>
       </div>
       <button class="btn-primary intro-line" style="animation-delay: 4.0s" onclick="renderNameCharacterSelect()">
         <span class="btn-key">Enter</span> Begin
@@ -378,7 +379,7 @@ function renderWeek() {
         <span class="choice-key">${i + 1}</span>
         <div class="choice-content">
           <div class="choice-label">${c.label}</div>
-          <div class="choice-effects">${formatEffectsHTML(c.effects)}</div>
+          ${c.hint ? `<div class="choice-hint dim">${c.hint}</div>` : ''}
         </div>
       </button>
     `).join('');
@@ -428,7 +429,7 @@ function renderEnding() {
   hudEl.innerHTML = '';
 
   const toolName = state.tool ? TOOLS[state.tool].name : 'None';
-  const totalRevenue = state.completedProjects.reduce((sum, p) => sum + (p.weeklyIncome * 52), 0);
+  const totalRevenue = state.completedProjects.reduce((sum, p) => sum + (p.weeklyIncome * TOTAL_WEEKS), 0);
 
   const doRender = () => {
     contentEl.innerHTML = `
@@ -487,7 +488,7 @@ function renderEnding() {
 
 function startGame() {
   state.week = 1;
-  state.savings = 80000;
+  state.savings = 30000;
   state.energy = 100;
   state.momentum = 50;
   state.appsShipped = 0;
@@ -503,6 +504,7 @@ function startGame() {
   state.totalPassiveIncome = 0;
   state.technicalSkill = 10;
   state.reputation = 30;
+  state.familyScore = 0;
   state.firedInflections = [];
   state.pendingScene = null;
 
@@ -520,24 +522,21 @@ function renderProjectSelect() {
   const offered = shuffled.slice(0, Math.min(3, shuffled.length));
 
   const toolStats = getEffectiveToolStats();
-  const sizeLabels = { small: 'Small', medium: 'Medium', large: 'Large' };
+
+  const sizeHints = {
+    small: 'Quick build \u00b7 A few weeks',
+    medium: 'Steady commitment \u00b7 Several weeks',
+    large: 'Major undertaking \u00b7 Over a month'
+  };
 
   const cardsHTML = offered.map((proj, i) => {
-    const adjWeeks = Math.ceil(proj.baseWeeks * toolStats.buildSpeedMod);
-    const adjEnergy = Math.ceil(proj.baseEnergy * toolStats.energyMod);
     return `
       <button class="choice-card" onclick="selectProject(${i})">
         <span class="choice-key">${i + 1}</span>
         <div class="choice-content">
           <div class="choice-label">${proj.name}</div>
           <div class="project-desc dim">${proj.description}</div>
-          <div class="choice-effects">
-            <span class="blue">${sizeLabels[proj.size]} (${adjWeeks} wks)</span>
-            <span class="dim">·</span>
-            <span class="red">Energy -${adjEnergy}/wk</span>
-            <span class="dim">·</span>
-            <span class="green">~${formatMoney(proj.baseIncome)}/wk on ship</span>
-          </div>
+          <div class="choice-hint dim">${sizeHints[proj.size]}</div>
         </div>
       </button>
     `;
@@ -549,7 +548,7 @@ function renderProjectSelect() {
       <span class="choice-key">${skipIndex + 1}</span>
       <div class="choice-content">
         <div class="choice-label">Take a break from projects</div>
-        <div class="choice-effects"><span class="green">Energy +5</span> <span class="dim">·</span> <span class="red">Momentum -3</span></div>
+        <div class="choice-hint dim">Rest up, but lose some drive</div>
       </div>
     </button>
   `;
@@ -623,6 +622,7 @@ function renderProjectComplete() {
     choices: [
       {
         label: 'Ship it!',
+        hint: 'Put it out there',
         effects: { momentum: shipMomentum, appsShipped: 1 },
         result: weeklyIncome > 150
           ? `You hit deploy. Within a week, people are signing up. It's making ${formatMoney(weeklyIncome)}/week. You built something real.`
@@ -631,6 +631,7 @@ function renderProjectComplete() {
       },
       {
         label: 'Abandon it — not good enough',
+        hint: 'Walk away, start fresh',
         effects: { momentum: -15, energy: 10 },
         result: "You close the repo. It wasn't right. The momentum hit stings, but you're free to try something new.",
         _shipData: null
@@ -667,20 +668,20 @@ function handleChoice(index) {
   if (event.id === 'late_night' && index === 0) state.pendingScene = 'late-night';
   if (event.id === 'laptop_drawing') state.pendingScene = 'family';
   if (event.id === 'board_games' && index === 0) state.pendingScene = 'family';
+  if (event.id === 'flow_state' && index === 1) state.pendingScene = 'family';
   if (event.id === 'flow_state' && index === 0) state.pendingScene = 'flow-state';
   if (event.id === 'coffee_shop') state.pendingScene = 'coffee-shop';
   if (event.id === 'family_vacation') state.pendingScene = 'vacation';
   if (event.id === 'first_revenue') state.pendingScene = 'payday';
-  if (event.id === 'hackathon' && index === 0) state.pendingScene = 'ship';
   if (event.id === 'hacker_news' && index === 0) state.pendingScene = 'late-night';
   if (event.id === 'partner_question') state.pendingScene = 'family';
   if (event.id === 'exercise' && index === 0) state.pendingScene = 'sunrise';
   if (event.id === 'good_sleep') state.pendingScene = 'sunrise';
   if (event.id === 'kid_sick' && index === 0) state.pendingScene = 'family';
-  if (event.id === 'swim_lessons' && index === 0) state.pendingScene = 'flow-state';
+  if (event.id === 'swim_lessons' && index === 1) state.pendingScene = 'family';
   if (event.id === 'scope_creep' && index >= 1) state.pendingScene = 'ship';
   if (event.id === 'old_friend' && index === 0) state.pendingScene = 'coffee-shop';
-  if (event.id === 'company_hackathon' && index === 0) state.pendingScene = 'flow-state';
+  if (event.id === 'bedtime_routine' && index === 0) state.pendingScene = 'family';
 
   renderHUD();
   state.phase = 'result';
@@ -723,7 +724,7 @@ function nextWeek() {
   }
 
   // If no active project, offer project selection periodically
-  if (!state.activeProject && state.momentum > 15 && state.week % 4 === 0) {
+  if (!state.activeProject && state.momentum > 15 && state.week % 3 === 0) {
     renderProjectSelect();
     return;
   }
@@ -739,6 +740,7 @@ function applyEffects(effects) {
   if (effects.energy) state.energy += effects.energy;
   if (effects.momentum) state.momentum += effects.momentum;
   if (effects.appsShipped) state.appsShipped += effects.appsShipped;
+  if (effects.familyScore) state.familyScore += effects.familyScore;
 
   state.energy = clamp(state.energy, 0, 100);
   state.momentum = clamp(state.momentum, 0, 100);
@@ -794,8 +796,8 @@ function applyWeeklyTick() {
 
 function checkGameOver() {
   if (state.savings <= 0) return true;
-  if (state.zeroEnergyWeeks >= 3) return true;
-  if (state.zeroMomentumWeeks >= 8) return true;
+  if (state.zeroEnergyWeeks >= 2) return true;
+  if (state.zeroMomentumWeeks >= 5) return true;
   return false;
 }
 
@@ -803,33 +805,44 @@ function getEnding() {
   // Lose conditions
   if (state.savings <= 0) {
     return { isWin: false, title: 'Broke', sceneId: 'burnout',
-      description: "The money ran out. API bills, domain names, and that one course you bought but never finished. The dream isn't dead — just on pause." };
+      description: "The money ran out. Rent, daycare, API bills — it adds up fast in the Bay Area. The dream isn't dead, but the runway is." };
   }
-  if (state.zeroEnergyWeeks >= 3) {
+  if (state.zeroEnergyWeeks >= 2) {
     return { isWin: false, title: 'Burnout', sceneId: 'burnout',
-      description: "Three weeks of zero energy. Your doctor says to step away from the screens. Your body chose for you." };
+      description: "Two weeks of zero energy. Your body chose for you. The laptop stays closed." };
   }
-  if (state.zeroMomentumWeeks >= 8) {
+  if (state.zeroMomentumWeeks >= 5) {
     return { isWin: false, title: 'Lost the Thread', sceneId: null,
-      description: "Two months without touching code. The editor gathers dust. The ideas fade. You meant to get back to it. You always meant to." };
+      description: "Five weeks without touching code. The editor gathers dust. You meant to get back to it. You always meant to." };
   }
 
-  // Win conditions (survived 52 weeks)
-  if (state.appsShipped >= 5) {
+  // Win conditions — success × family matrix
+  const successScore = state.appsShipped * 10 + (state.totalPassiveIncome / 50);
+  const fs = state.familyScore;
+
+  if (successScore >= 30) {
+    if (fs >= 3) return { isWin: true, title: 'Sustainable Builder', sceneId: 'ending-builder',
+      description: "You shipped real products AND stayed present for your family. The rarest ending. You proved it doesn't have to be either/or." };
+    if (fs <= -3) return { isWin: true, title: 'The Workaholic', sceneId: 'late-night',
+      description: "You shipped everything. But at what cost? Your kid's drawings show you holding a laptop. Your spouse stopped asking about your day." };
     return { isWin: true, title: 'The Builder', sceneId: 'ending-builder',
-      description: "5+ apps shipped. You're not a PM who codes — you're a builder who happens to have a day job. For now." };
+      description: "Apps shipped, income flowing. You're not a PM who codes — you're a builder. The family stuff... you'll figure that out next." };
   }
-  if (state.appsShipped >= 3) {
+  if (successScore >= 15) {
+    if (fs >= 3) return { isWin: true, title: 'Present Parent', sceneId: 'family',
+      description: "You didn't ship the most, but your family never doubted you were there. And you still built something real. That's enough." };
+    if (fs <= -3) return { isWin: true, title: 'The Grinder', sceneId: 'burnout',
+      description: "You shipped some things. Missed some things. Your spouse says 'we need to talk' and you know it's not about the code." };
     return { isWin: true, title: 'The Shipper', sceneId: 'flow-state',
       description: "Not everything worked, but you shipped. Most people talk about building. You actually did it." };
   }
-  if (state.appsShipped >= 1) {
-    return { isWin: true, title: 'The Tinkerer', sceneId: 'late-night',
-      description: "You shipped something real. It's a start. The first app is always the hardest." };
-  }
-
-  return { isWin: false, title: 'The Dreamer', sceneId: null,
-    description: "You survived the year but never shipped. The ideas are still in your notes app. Maybe next year." };
+  // Low success
+  if (fs >= 3) return { isWin: true, title: 'The Good Parent', sceneId: 'family',
+    description: "You chose your family over the grind. Not much shipped, but your kid's drawing now shows you holding their hand." };
+  if (fs <= -3) return { isWin: false, title: 'Lost in the Grind', sceneId: 'burnout',
+    description: "You sacrificed family time but didn't ship much either. The worst of both worlds. Time to reset." };
+  return { isWin: false, title: 'The Tinkerer', sceneId: 'late-night',
+    description: "You tinkered. You learned. You didn't quite ship or quite show up. But the seed is planted." };
 }
 
 // ========================================
@@ -964,8 +977,8 @@ function formatMoney(n) {
 }
 
 function getSavingsColor() {
-  if (state.savings < 20000) return 'red';
-  if (state.savings < 40000) return 'yellow';
+  if (state.savings < 10000) return 'red';
+  if (state.savings < 20000) return 'yellow';
   return '';
 }
 
@@ -988,11 +1001,13 @@ function formatEffectsHTML(effects) {
     savings: 'Savings',
     energy: 'Energy',
     momentum: 'Momentum',
-    appsShipped: 'Shipped'
+    appsShipped: 'Shipped',
+    familyScore: 'Family'
   };
 
   for (const [key, val] of Object.entries(effects)) {
     if (val === 0) continue;
+    if (key.startsWith('_')) continue;
     const sign = val > 0 ? '+' : '';
     const colorClass = val > 0 ? 'green' : 'red';
 
@@ -1001,7 +1016,7 @@ function formatEffectsHTML(effects) {
     } else if (key === 'appsShipped') {
       parts.push(`<span class="green">+${val} app shipped</span>`);
     } else {
-      parts.push(`<span class="${colorClass}">${labels[key]} ${sign}${val}</span>`);
+      parts.push(`<span class="${colorClass}">${labels[key] || key} ${sign}${val}</span>`);
     }
   }
 

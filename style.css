@@ -498,6 +498,12 @@ body {
   gap: 4px 12px;
 }
 
+.choice-hint {
+  font-size: 11px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
 /* --- Result --- */
 
 .result {
