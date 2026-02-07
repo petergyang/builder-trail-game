@@ -5,6 +5,7 @@
 // --- Constants ---
 const TOTAL_WEEKS = 26;
 const APPS_TO_SHIP = 5;
+const SHIP_CREDITS = { small: 1, medium: 2, large: 3 };
 const WEEKLY_INCOME = 4000;
 const WEEKLY_EXPENSES = 3500;
 const WEEKLY_ENERGY_DRAIN = 4;
@@ -541,9 +542,9 @@ function renderProjectSelect() {
   const toolStats = getEffectiveToolStats();
 
   const sizeHints = {
-    small: 'Quick build \u00b7 A few weeks',
-    medium: 'Steady commitment \u00b7 Several weeks',
-    large: 'Major undertaking \u00b7 Over a month'
+    small: '1 ship credit \u00b7 A few weeks',
+    medium: '2 ship credits \u00b7 Several weeks',
+    large: '3 ship credits \u00b7 Over a month'
   };
 
   const cardsHTML = offered.map((proj, i) => {
@@ -630,6 +631,7 @@ function renderProjectComplete() {
     ? " The AI-generated code hit a wall — you had to rewrite chunks manually." : '';
 
   const shipMomentum = 20 + (tool.momentumOnShip || 0);
+  const shipCredits = SHIP_CREDITS[project.size] || 1;
 
   let qualityText;
   if (qualityScore >= 0.8) qualityText = "It's polished. You're proud of this one.";
@@ -645,8 +647,8 @@ function renderProjectComplete() {
     choices: [
       {
         label: 'Ship it!',
-        hint: 'Put it out there',
-        effects: { momentum: shipMomentum, appsShipped: 1 },
+        hint: `+${shipCredits} ship credit${shipCredits > 1 ? 's' : ''}`,
+        effects: { momentum: shipMomentum, appsShipped: shipCredits },
         result: weeklyIncome > 150
           ? `You hit deploy. Within a week, people are signing up. It's making ${formatMoney(weeklyIncome)}/week. You built something real.`
           : `It's live. A few people try it. Revenue trickles in at ${formatMoney(weeklyIncome)}/week. Not a hit, but it's shipped.`,
@@ -1036,7 +1038,7 @@ function formatEffectsHTML(effects) {
     if (key === 'savings') {
       parts.push(`<span class="${colorClass}">${sign}${formatMoney(val)}</span>`);
     } else if (key === 'appsShipped') {
-      parts.push(`<span class="green">+${val} app shipped</span>`);
+      parts.push(`<span class="green">+${val} ship credit${val > 1 ? 's' : ''}</span>`);
     } else {
       parts.push(`<span class="${colorClass}">${labels[key] || key} ${sign}${val}</span>`);
     }
