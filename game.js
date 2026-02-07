@@ -614,11 +614,17 @@ function renderProjectComplete() {
 
   const shipMomentum = 20 + (tool.momentumOnShip || 0);
 
+  let qualityText;
+  if (qualityScore >= 0.8) qualityText = "It's polished. You're proud of this one.";
+  else if (qualityScore >= 0.5) qualityText = "It's solid. Not perfect, but it works.";
+  else if (qualityScore >= 0.3) qualityText = "It's rough around the edges. Could use more time.";
+  else qualityText = "Honestly? It's janky. The code is held together with duct tape.";
+
   state.currentEvent = {
     id: 'project-complete-' + project.id,
     type: 'building',
     title: `${project.name} is Ready`,
-    text: `You've been working on ${project.name} for ${project.weeksWorked} weeks. It's time to decide.${ceilingPenalty}`,
+    text: `You've been working on ${project.name} for ${project.weeksWorked} weeks. ${qualityText}${ceilingPenalty}`,
     choices: [
       {
         label: 'Ship it!',
