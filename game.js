@@ -219,12 +219,27 @@ function renderToolSelect() {
   const toolKeys = Object.keys(TOOLS);
   const cardsHTML = toolKeys.map((key, i) => {
     const t = TOOLS[key];
+    const stats = [];
+    const energyPct = Math.round((1 - t.energyMod) * 100);
+    if (energyPct > 0) stats.push(`<span class="green">${energyPct}% less energy</span>`);
+    else if (energyPct < 0) stats.push(`<span class="red">${-energyPct}% more energy</span>`);
+    else stats.push(`<span class="dim">Baseline energy</span>`);
+
+    const speedPct = Math.round((1 - t.buildSpeedMod) * 100);
+    if (speedPct > 0) stats.push(`<span class="green">${speedPct}% faster builds</span>`);
+    else if (speedPct < 0) stats.push(`<span class="red">${-speedPct}% slower builds</span>`);
+
+    if (t.passiveIncomeMod > 1) stats.push(`<span class="green">+${Math.round((t.passiveIncomeMod - 1) * 100)}% income</span>`);
+    if (t.passiveIncomeMod < 1) stats.push(`<span class="red">${Math.round((t.passiveIncomeMod - 1) * 100)}% income</span>`);
+    if (t.momentumOnShip > 0) stats.push(`<span class="green">+${t.momentumOnShip} momentum on ship</span>`);
+    if (t.ceilingWeeks) stats.push(`<span class="yellow">Stalls after ${t.ceilingWeeks}wk on med/large</span>`);
+
     return `
       <button class="tool-card" onclick="selectTool('${key}')">
         <span class="choice-key">${i + 1}</span>
         <div class="tool-name">${t.name}</div>
         <div class="tool-tagline">${t.tagline}</div>
-        <div class="tool-special">${t.specialText}</div>
+        <div class="tool-stats">${stats.join('<span class="dim"> · </span>')}</div>
       </button>
     `;
   }).join('');

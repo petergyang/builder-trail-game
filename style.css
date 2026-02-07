@@ -282,6 +282,15 @@ body {
   margin-top: 4px;
 }
 
+.tool-stats {
+  font-size: 11px;
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  justify-content: center;
+}
+
 /* --- Name + Character Selection --- */
 
 .name-select {
