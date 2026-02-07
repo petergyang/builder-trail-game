@@ -4,7 +4,7 @@
 
 // --- Constants ---
 const TOTAL_WEEKS = 26;
-const APPS_TO_SHIP = 3;
+const APPS_TO_SHIP = 5;
 const WEEKLY_INCOME = 4000;
 const WEEKLY_EXPENSES = 3500;
 const WEEKLY_ENERGY_DRAIN = 4;
