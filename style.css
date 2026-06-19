@@ -144,25 +144,38 @@ img {
   min-width: 0;
 }
 
-.hud-avatar {
+/* Below the name/week bar: full-body character panel beside the 2x2 meter grid. */
+.hud-body {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.hud-char {
   flex: none;
-  width: 82px;
-  height: 68px;
-  background-repeat: no-repeat;
-  background-size: 328px 68px;
-  background-color: #161210;
+  width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: #161210;
   border: 1px solid var(--line-2);
-  border-radius: 10px;
-  animation: laptopAnim 1.2s steps(4) infinite;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.hud-avatar-builderguy { background-image: url("assets/avatars/BuilderGuy_laptop.png"); }
-.hud-avatar-buildergirl { background-image: url("assets/avatars/BuilderGirl_laptop.png"); }
-
-@keyframes laptopAnim {
-  from { background-position: 0 0; }
-  to { background-position: -328px 0; }
+/* Static full-body sprite (first frame of the idle sheet) — no animation. */
+.hud-sprite {
+  width: 74px;
+  height: 140px;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: 444px 140px;
+  image-rendering: auto;
 }
+
+.hud-sprite-builderguy { background-image: url("assets/avatars/BuilderGuy_idle.png"); }
+.hud-sprite-buildergirl { background-image: url("assets/avatars/BuilderGirl_idle.png"); }
 
 .hud-dot {
   flex: none;
@@ -193,8 +206,10 @@ img {
 /* Meters */
 
 .meter-grid {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -955,7 +970,7 @@ img {
 
 .char-sprite {
   image-rendering: pixelated;
-  animation: avatarAnim 1.1s steps(4) infinite;
+  animation: avatarAnim 1.7s steps(6) infinite;
 }
 
 .char-name { font-size: 13px; font-weight: 700; color: var(--text-strong); }
@@ -1310,15 +1325,14 @@ img {
     gap: 10px;
   }
 
-  .hud-avatar {
-    width: 64px;
-    height: 53px;
-    background-size: 256px 53px;
-  }
+  .hud-body { gap: 10px; }
 
-  @keyframes laptopAnim {
-    from { background-position: 0 0; }
-    to { background-position: -256px 0; }
+  .hud-char { width: 84px; padding: 4px; }
+
+  .hud-sprite {
+    width: 50px;
+    height: 94px;
+    background-size: 300px 94px;
   }
 
   .seg { height: 9px; }

@@ -13,10 +13,10 @@ const WEEKLY_ENERGY_DRAIN = 0;
 const WEEKLY_MOMENTUM_DECAY = 4;
 const QUIET_WEEK_CHANCE = 0; // no free-recovery weeks — every card must be a real tradeoff
 const MAX_HISTORY = 5;
-const AVATAR_IDLE_FRAME_WIDTH = 88;
-const AVATAR_FRAME_HEIGHT = 136;
-const AVATAR_IDLE_FRAMES = 4;
-const AVATAR_SELECT_SCALE = 1;
+const AVATAR_IDLE_FRAME_WIDTH = 160;
+const AVATAR_FRAME_HEIGHT = 302;
+const AVATAR_IDLE_FRAMES = 6;
+const AVATAR_SELECT_SCALE = 0.5;
 
 const NEWSLETTER_URL = 'https://creatoreconomy.so/';
 const YOUTUBE_URL = 'https://www.youtube.com/@PeterYangYT';
@@ -338,13 +338,17 @@ function renderHUD() {
     <div class="hud-panel">
       <div class="hud-bar">
         <div class="hud-id">
-          <div class="hud-avatar hud-avatar-${charName.toLowerCase()}" aria-hidden="true"></div>
           <span class="hud-dot"></span>
           <span class="hud-name">${displayName}</span>
         </div>
         <span class="hud-week">${weekLabel}</span>
       </div>
-      <div class="meter-grid">${metersHTML}</div>
+      <div class="hud-body">
+        <div class="hud-char" aria-hidden="true">
+          <div class="hud-sprite hud-sprite-${charName.toLowerCase()}"></div>
+        </div>
+        <div class="meter-grid">${metersHTML}</div>
+      </div>
       ${renderProjectRow()}
     </div>
   `;
@@ -1375,7 +1379,7 @@ function personalize(text) {
 }
 
 function preloadCharacterSheets(charName) {
-  ['idle', 'laptop'].forEach(sheet => {
+  ['idle'].forEach(sheet => {
     const img = new Image();
     img.src = `assets/avatars/${charName}_${sheet}.png`;
   });
