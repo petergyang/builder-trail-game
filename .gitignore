@@ -1,2 +1,6 @@
 .playwright-mcp/
 .DS_Store
+tmp/
+.claude/
+__pycache__/
+*.pyc
