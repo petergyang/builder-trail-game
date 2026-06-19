@@ -25,7 +25,6 @@ let generatedSceneIds = new Set();
 // --- Survival attributes (spec model: Money / Health / Relationships / Agency) ---
 // The four attributes are the real survival state, shown as 0-10 segmented meters.
 // They are driven by translating each choice's legacy effects (see effectToAttributes).
-const ACCENT = '#d97757';
 const ATTRS = [
   { key: 'money', letter: 'M', name: 'MONEY' },
   { key: 'health', letter: 'H', name: 'HEALTH' },
@@ -275,58 +274,6 @@ function confirmNameCharacter() {
   startGame();
 }
 
-function renderToolSelect() {
-  state.phase = 'toolSelect';
-  hudEl.innerHTML = '';
-
-  const toolKeys = Object.keys(TOOLS);
-  const cardsHTML = toolKeys.map((key, i) => {
-    const tool = TOOLS[key];
-    const stats = getToolStatLabels(tool);
-    return `
-      <button class="tool-card" onclick="selectTool('${key}')">
-        <span class="choice-key">${i + 1}</span>
-        <div class="tool-name">${tool.name}</div>
-        <div class="tool-tagline">${tool.tagline}</div>
-        <div class="tool-special">${tool.specialText}</div>
-        <div class="tool-stats">${stats.join('<span class="dim"> / </span>')}</div>
-      </button>
-    `;
-  }).join('');
-
-  contentEl.innerHTML = `
-    <section class="tool-select screen">
-      <p class="eyebrow">Primary stack</p>
-      <h2 class="screen-title">Choose your build style</h2>
-      <p class="screen-subtitle">This is not cosmetic. Your tool changes energy, speed, income, and the kind of chaos that finds you.</p>
-      <div class="tool-grid">${cardsHTML}</div>
-    </section>
-  `;
-}
-
-function getToolStatLabels(tool) {
-  const stats = [];
-  const energyPct = Math.round((1 - tool.energyMod) * 100);
-  if (energyPct > 0) stats.push(`<span class="green">${energyPct}% less energy</span>`);
-  else if (energyPct < 0) stats.push(`<span class="red">${-energyPct}% more energy</span>`);
-  else stats.push(`<span class="dim">baseline energy</span>`);
-
-  const speedPct = Math.round((1 - tool.buildSpeedMod) * 100);
-  if (speedPct > 0) stats.push(`<span class="green">${speedPct}% faster</span>`);
-  else if (speedPct < 0) stats.push(`<span class="red">${-speedPct}% slower</span>`);
-  else stats.push(`<span class="dim">baseline speed</span>`);
-
-  if (tool.passiveIncomeMod > 1) stats.push(`<span class="green">higher upside</span>`);
-  if (tool.passiveIncomeMod < 1) stats.push(`<span class="yellow">lower revenue ceiling</span>`);
-  if (tool.ceilingWeeks) stats.push(`<span class="yellow">stalls on bigger apps</span>`);
-  return stats;
-}
-
-function selectTool(toolKey) {
-  if (state.phase !== 'toolSelect') return;
-  state.tool = toolKey;
-  startGame();
-}
 
 function renderHUD() {
   const displayName = escapeHTML((state.playerName || 'builder').toUpperCase());
@@ -1407,79 +1354,6 @@ function getPercent(current, max) {
   return clamp(Math.round((current / max) * 100), 0, 100);
 }
 
-function getSavingsColor() {
-  if (state.savings < 8000) return 'red';
-  if (state.savings < 16000) return 'yellow';
-  return 'green';
-}
-
-function getMeterClass(value) {
-  if (value <= 30) return 'red';
-  if (value <= 60) return 'yellow';
-  return 'green';
-}
-
-function getInverseMeterClass(value) {
-  if (value >= 75) return 'red';
-  if (value >= 50) return 'yellow';
-  return 'green';
-}
-
-function getFamilyLabel() {
-  if (state.familyScore >= 5) return 'steady';
-  if (state.familyScore >= 1) return 'warm';
-  if (state.familyScore <= -5) return 'strained';
-  if (state.familyScore <= -1) return 'thin';
-  return 'okay';
-}
-
-function getFamilyClass() {
-  if (state.familyScore <= -5) return 'red';
-  if (state.familyScore <= -1) return 'yellow';
-  return 'green';
-}
-
-function makeBar(current, max, width) {
-  const filled = clamp(Math.round((current / max) * width), 0, width);
-  const empty = width - filled;
-  const pct = current / max;
-  let colorClass = 'green';
-  if (pct <= 0.3) colorClass = 'red';
-  else if (pct <= 0.6) colorClass = 'yellow';
-  return `<span class="bar-fill ${colorClass}">${'█'.repeat(filled)}</span><span class="bar-empty">${'░'.repeat(empty)}</span>`;
-}
-
-function formatEffectsHTML(effects) {
-  if (!effects) return '<span class="effect-chip dim">no visible change</span>';
-  const labels = {
-    savings: 'Runway',
-    energy: 'Energy',
-    momentum: 'Momentum',
-    appsShipped: 'Shipped',
-    familyScore: 'Family',
-    technicalSkill: 'Skill',
-    reputation: 'Rep',
-    audience: 'Audience',
-    totalPassiveIncome: 'Income'
-  };
-
-  const parts = [];
-  Object.entries(effects).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value === 0 || key.startsWith('_')) return;
-    if (key === 'corpLoad') return;
-    const isBadWhenPositive = key === 'corpLoad';
-    const positive = value > 0;
-    const good = isBadWhenPositive ? !positive : positive;
-    const colorClass = good ? 'green' : 'red';
-    const sign = positive ? '+' : '';
-    const displayValue = key === 'savings' || key === 'totalPassiveIncome'
-      ? `${sign}${formatMoney(value)}`
-      : `${sign}${value}`;
-    parts.push(`<span class="effect-chip ${colorClass}">${labels[key] || key} ${displayValue}</span>`);
-  });
-
-  return parts.join('') || '<span class="effect-chip dim">no visible change</span>';
-}
 
 function escapeHTML(value) {
   return String(value)
@@ -1552,15 +1426,6 @@ function handleKeydown(event) {
     return;
   }
 
-  if (state.phase === 'toolSelect') {
-    if (event.key >= '1' && event.key <= '5') {
-      const keys = Object.keys(TOOLS);
-      selectTool(keys[parseInt(event.key, 10) - 1]);
-      return;
-    }
-    if (handleArrowNav(event, '.tool-card')) return;
-    return;
-  }
 
   if (state.phase === 'projectSelect') {
     if (event.key >= '1' && event.key <= '9') {
