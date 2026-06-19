@@ -146,10 +146,10 @@ img {
 
 .hud-avatar {
   flex: none;
-  width: 76px;
-  height: 62px;
+  width: 82px;
+  height: 68px;
   background-repeat: no-repeat;
-  background-size: 304px auto;
+  background-size: 328px 68px;
   background-color: #161210;
   border: 1px solid var(--line-2);
   border-radius: 10px;
@@ -161,7 +161,7 @@ img {
 
 @keyframes laptopAnim {
   from { background-position: 0 0; }
-  to { background-position: -304px 0; }
+  to { background-position: -328px 0; }
 }
 
 .hud-dot {
@@ -1098,6 +1098,23 @@ img {
   margin-bottom: 12px;
 }
 
+.ending-cause {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 16px;
+  padding: 7px 13px;
+  border: 1px solid var(--loss);
+  border-radius: 8px;
+  background: rgba(224, 115, 90, 0.12);
+  color: var(--loss);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.ending-cause-x { font-size: 11px; opacity: 0.85; }
+
 .ending-description { color: #a39a8d; margin-bottom: 20px; }
 
 .ending-stats {
@@ -1294,14 +1311,14 @@ img {
   }
 
   .hud-avatar {
-    width: 60px;
-    height: 50px;
-    background-size: 240px auto;
+    width: 64px;
+    height: 53px;
+    background-size: 256px 53px;
   }
 
   @keyframes laptopAnim {
     from { background-position: 0 0; }
-    to { background-position: -240px 0; }
+    to { background-position: -256px 0; }
   }
 
   .seg { height: 9px; }

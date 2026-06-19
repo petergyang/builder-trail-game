@@ -39,10 +39,7 @@ const INFLECTIONS = [
         result: "Fixed in a day. Your spouse is relieved. Your savings take a hit, but the house is dry." },
       { label: 'DIY it over the weekend', effects: { savings: -800, energy: -15, familyScore: -1, technicalSkill: 2 },
         hint: 'Cheaper but exhausting',
-        result: "YouTube tutorials, three trips to Home Depot, and a very long weekend. It works. Mostly. You're destroyed." },
-      { label: 'Patch it and pray', effects: { savings: -200, energy: -5 },
-        hint: 'Might not hold',
-        result: "Duct tape and hope. It'll hold for now. Probably." }
+        result: "YouTube tutorials, three trips to Home Depot, and a very long weekend. It works. Mostly. You're destroyed." }
     ]
   },
   {
@@ -57,10 +54,7 @@ const INFLECTIONS = [
         result: "You pay it without blinking. Your kid thinks the cast is cool. That's what matters." },
       { label: 'Fight the insurance company', effects: { savings: -1200, energy: -12, momentum: -5, familyScore: 1 },
         hint: 'Hours on hold',
-        result: "Three hours on hold. Four phone calls. They cover another $2,000. You lose a week of building momentum." },
-      { label: 'Set up a payment plan', effects: { savings: -800, momentum: -3 },
-        hint: 'Spread the pain',
-        result: "Monthly payments. The bill hangs over you but the immediate hit is manageable." }
+        result: "Three hours on hold. Four phone calls. They cover another $2,000. You lose a week of building momentum." }
     ]
   },
   {
@@ -75,10 +69,7 @@ const INFLECTIONS = [
         result: "New transmission. Car runs like new. Savings don't." },
       { label: 'Find the cheapest fix', effects: { savings: -800, energy: -8, momentum: 3 },
         hint: 'Band-aid solution',
-        result: "A shade-tree mechanic does something. It runs. The check engine light is on, but it runs." },
-      { label: 'Bike and bus for a while', effects: { savings: 1200, energy: -10, momentum: -5, familyScore: -1 },
-        hint: 'Save money, lose time',
-        result: "Daycare drop-off by bus takes 45 minutes. Your spouse is not thrilled. But you saved $2,000." }
+        result: "A shade-tree mechanic does something. It runs. The check engine light is on, but it runs." }
     ]
   },
   {
@@ -93,10 +84,7 @@ const INFLECTIONS = [
         result: "Gone. Just like that. But at least the IRS won't come knocking." },
       { label: 'Defer and pay the penalty later', effects: { savings: -1500, momentum: 6, energy: -5 },
         hint: 'Kicks the can',
-        result: "You'll deal with it in April. The penalty adds up but you keep building." },
-      { label: 'Panic-optimize your deductions', effects: { savings: -3000, energy: -10 },
-        hint: 'Stressful but saves money',
-        result: "You spend a weekend in TurboTax hell. Home office deduction, equipment write-offs. You knock it down to $3,000." }
+        result: "You'll deal with it in April. The penalty adds up but you keep building." }
     ]
   },
 
@@ -128,10 +116,7 @@ const INFLECTIONS = [
         result: "Day job, freelance, side projects, family. Something has to give. Guess which one." },
       { label: 'Decline — focus on your apps', effects: { momentum: 10, savings: -500 },
         hint: 'Bet on yourself',
-        result: "You turn down guaranteed income to bet on yourself. Terrifying. But your apps need your attention." },
-      { label: 'Negotiate: 5 hours a week', effects: { savings: 750, energy: -8 },
-        hint: 'Balanced approach',
-        result: "Half the work, half the pay. A sustainable side-side-hustle." }
+        result: "You turn down guaranteed income to bet on yourself. Terrifying. But your apps need your attention." }
     ]
   },
   {
@@ -146,10 +131,7 @@ const INFLECTIONS = [
         result: "You downgrade everything. Free tiers, no eating out, cancel swim lessons. The bleeding stops." },
       { label: 'Push harder — ship for revenue', effects: { energy: -10, momentum: 15 },
         hint: 'Desperation mode',
-        result: "Desperation is a hell of a motivator. You focus everything on getting to revenue." },
-      { label: 'Ask for a raise at work', effects: { savings: 3000, energy: -5, momentum: -5 },
-        hint: 'Awkward but practical',
-        result: "Awkward conversation. But it works. More runway, less pride." }
+        result: "Desperation is a hell of a motivator. You focus everything on getting to revenue." }
     ]
   }
 ];
@@ -249,10 +231,7 @@ const PROJECT_EVENTS = [
         result: "You can't out-resource them, but you can out-speed them. Your family doesn't see you for a week." },
       { label: 'Find your niche', effects: { energy: -12, momentum: 10 },
         hint: 'Pivot slightly',
-        result: "You pivot slightly. Your version serves a niche they'll never bother with." },
-      { label: 'Abandon — they already won', effects: { energy: 10, momentum: -15 },
-        hint: 'Cut your losses',
-        result: "You close the project. The sting fades. Onto the next idea." }
+        result: "You pivot slightly. Your version serves a niche they'll never bother with." }
     ]
   }
 ];
@@ -276,11 +255,7 @@ const EVENTS = [
       { label: 'Ask what decision this unlocks',
         effects: { energy: -4, corpLoad: -7, reputation: 3, momentum: 5 },
         hint: 'Dangerously direct',
-        result: "A silence falls over the room. Then someone admits there is no decision. The meeting ends 18 minutes early." },
-      { label: 'Schedule a pre-read review',
-        effects: { corpLoad: 15, energy: -3, familyScore: -1 },
-        hint: 'The machine feeds',
-        result: "You have created a meeting to discuss a document for a meeting. BigTechCo smiles." }
+        result: "A silence falls over the room. Then someone admits there is no decision. The meeting ends 18 minutes early." }
     ]
   },
   {
@@ -297,11 +272,7 @@ const EVENTS = [
       { label: 'Use impressive abstractions',
         effects: { reputation: 4, corpLoad: 8, energy: -3 },
         hint: 'Executive-safe',
-        result: "The wording is gorgeous and means almost nothing. It sails through review." },
-      { label: 'Ship your side project instead',
-        effects: { momentum: 12, reputation: -5, corpLoad: 4, familyScore: -1 },
-        hint: 'Rebel with Wi-Fi',
-        result: "Your OKR draft is late. Your app has a settings page now. History will judge." }
+        result: "The wording is gorgeous and means almost nothing. It sails through review." }
     ]
   },
   {
@@ -386,11 +357,7 @@ const EVENTS = [
       { label: 'Simplify the launch',
         effects: { corpLoad: -5, momentum: 8, reputation: -2, energy: -2 },
         hint: 'Less surface area',
-        result: "You cut the risky claims and ship a smaller message. It is not sexy. It is live." },
-      { label: 'Postpone everything',
-        effects: { reputation: -2, corpLoad: 6, momentum: -10, energy: 4 },
-        hint: 'Nobody gets sued',
-        result: "The launch slides move one week. Your soul moves slightly farther away." }
+        result: "You cut the risky claims and ship a smaller message. It is not sexy. It is live." }
     ]
   },
   {
@@ -768,11 +735,7 @@ const EVENTS = [
       { label: 'Feel the guilt, keep building',
         effects: { energy: -5, momentum: 5, familyScore: -2 },
         hint: 'This is for them too... right?',
-        result: "You put the drawing on the fridge. You think about it while coding at midnight. It's complicated." },
-      { label: 'Build something together',
-        effects: { energy: 5, momentum: 10, familyScore: 2 },
-        hint: 'Let them press the spacebar',
-        result: "Your kid 'helps' you code. They press the spacebar 400 times. Best pairing session you've ever had." }
+        result: "You put the drawing on the fridge. You think about it while coding at midnight. It's complicated." }
     ]
   },
   {
@@ -804,11 +767,7 @@ const EVENTS = [
       { label: "'You're right, I need to find balance'",
         effects: { energy: 10, momentum: -5, familyScore: 2 },
         hint: 'Ease the tension',
-        result: "The pressure is off. Your spouse smiles. You mean it. You think you mean it." },
-      { label: "'I don't know yet'",
-        effects: { energy: 5, momentum: 5 },
-        hint: 'Honest but uncertain',
-        result: "Honest. 'Figure it out. I'm here.' That's enough for now." }
+        result: "The pressure is off. Your spouse smiles. You mean it. You think you mean it." }
     ]
   },
   {

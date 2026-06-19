@@ -482,36 +482,10 @@ function renderWeek() {
   state.phase = 'event';
 }
 
-function renderChoicePreviews(choices) {
-  if (!choices || choices.length < 2) return '';
-  return `
-    <div class="choice-preview choice-preview-left">${escapeHTML(choices[0].label)}</div>
-    <div class="choice-preview choice-preview-right">${escapeHTML(choices[1].label)}</div>
-  `;
-}
-
-function getChoiceDirectionClass(index, count) {
-  if (count < 2) return 'choice-neutral';
-  if (index === 0) return 'choice-left';
-  if (index === 1) return 'choice-right';
-  return 'choice-wildcard';
-}
-
 function getPlayableChoices(event) {
   if (!event || !Array.isArray(event.choices)) return [];
   if (event.choices.length <= 2) return event.choices;
   return event.choices.slice(0, 2);
-}
-
-function renderStakeLine(event) {
-  const stakes = [];
-  if (event.type === 'work') stakes.push('Corporate gravity is pulling harder.');
-  if (event.type === 'building' && state.activeProject) stakes.push(`${state.activeProject.name} is ${state.activeProject.weeksWorked}/${state.activeProject.weeksRequired} weeks complete.`);
-  if (state.corpLoad >= 75) stakes.push('Your calendar is becoming the villain.');
-  if (state.energy <= 25) stakes.push('Burnout is close.');
-  if (state.familyScore <= -5) stakes.push('Home is noticing the tradeoffs.');
-  if (!stakes.length) return '';
-  return `<p class="stakes">${stakes.map(escapeHTML).join(' ')}</p>`;
 }
 
 function renderResult(resultText, effects) {
@@ -617,7 +591,6 @@ function renderEnding() {
   state.phase = 'ending';
   hudEl.innerHTML = '';
 
-  const toolName = state.tool ? TOOLS[state.tool].name : 'None';
   const totalRevenue = state.completedProjects.reduce((sum, project) => sum + (project.weeklyIncome * Math.max(1, TOTAL_WEEKS - project.weekShipped)), 0);
   const shipList = state.completedProjects.length
     ? state.completedProjects.map(project => `<li>${escapeHTML(project.name)} <span>${formatMoney(project.weeklyIncome)}/wk</span></li>`).join('')
@@ -629,13 +602,13 @@ function renderEnding() {
         ${renderSceneBlock(ending.sceneId || 'late-night', 'ending-art', { moodFallback: true, type: ending.isWin ? 'building' : 'life' })}
         <div class="ending-badge ${ending.isWin ? 'win' : 'lose'}">${ending.isWin ? 'YEAR COMPLETE' : 'GAME OVER'}</div>
         <h1 class="ending-title">${escapeHTML(ending.title)}</h1>
+        ${!ending.isWin && ending.cause ? `<div class="ending-cause"><span class="ending-cause-x">&#10005;</span> ${escapeHTML(ending.cause)}</div>` : ''}
         <p class="ending-description">${escapeHTML(ending.description)}</p>
         <div class="ending-stats">
           <div class="stat-row"><span>Weeks survived</span><strong>${Math.min(state.week - 1, TOTAL_WEEKS)}</strong></div>
           <div class="stat-row"><span>Ship credits</span><strong>${state.appsShipped}/${APPS_TO_SHIP}</strong></div>
           <div class="stat-row"><span>Final runway</span><strong>${formatMoney(Math.max(0, state.savings))}</strong></div>
           <div class="stat-row"><span>Peak momentum</span><strong>${state.peakMomentum}</strong></div>
-          <div class="stat-row"><span>Tool</span><strong>${escapeHTML(toolName)}</strong></div>
           <div class="stat-row"><span>Est. trail revenue</span><strong>${formatMoney(totalRevenue)}</strong></div>
         </div>
         <ul class="ship-list">${shipList}</ul>
@@ -821,7 +794,6 @@ function handleChoice(index) {
   state.attrPrev = { money: state.money, health: state.health, relationships: state.relationships, agency: state.agency };
   state.hoverAttrs = [];
   applyEffects(choice.effects);
-  applySpecialChoice(choice);
   recordHistory(choice.memory || choice.label);
 
   state.lastEventId = event.id;
@@ -865,43 +837,6 @@ function handleChoiceClick(index) {
     return;
   }
   handleChoice(index);
-}
-
-function applySpecialChoice(choice) {
-  if ('_shipData' in choice) {
-    if (choice._shipData) {
-      state.completedProjects.push(choice._shipData);
-      state.totalPassiveIncome = state.completedProjects.reduce((sum, project) => sum + project.weeklyIncome, 0);
-      state.activeProject = null;
-      state.justShipped = true;
-      state.lastShipCopy = choice.result || '';
-      if (state.week >= TOTAL_WEEKS) state.finalLaunchPending = true;
-    } else if (choice._shipData === null) {
-      state.activeProject = null;
-      if (state.week >= TOTAL_WEEKS) state.finalLaunchPending = true;
-    }
-  }
-
-  if (choice._extendProject && state.activeProject) {
-    if (state.week >= TOTAL_WEEKS) {
-      state.activeProject = null;
-      state.finalLaunchPending = true;
-      return;
-    }
-    state.activeProject.weeksRequired += 1;
-    state.activeProject.baseIncome = Math.round(state.activeProject.baseIncome * 1.18);
-  }
-
-  if (choice._projectProgress && state.activeProject) {
-    state.activeProject.weeksWorked = Math.min(
-      state.activeProject.weeksRequired,
-      state.activeProject.weeksWorked + choice._projectProgress
-    );
-  }
-
-  if (choice._clearProject && state.activeProject) {
-    state.activeProject = null;
-  }
 }
 
 function nextWeek() {
@@ -1085,6 +1020,7 @@ function getEnding() {
     return {
       isWin: false,
       title: 'Burnout',
+      cause: 'Your HEALTH meter hit 0',
       sceneId: 'ending-burnout',
       description: "My body filed the last ticket and closed the laptop for me. Somewhere in the all-nighters and the skipped meals and “I’ll rest after this ship,” the after-this never came. The repo is fine. I am not."
     };
@@ -1094,6 +1030,7 @@ function getEnding() {
     return {
       isWin: false,
       title: 'Alone with the Repo',
+      cause: 'Your RELATIONSHIPS meter hit 0',
       sceneId: 'ending-alone',
       description: "Everything I built still runs. The house is quiet in the wrong way. I won every argument about my evenings and lost the evenings — and the people who used to be in them."
     };
@@ -1104,6 +1041,7 @@ function getEnding() {
     return {
       isWin: false,
       title: 'Still a Spectator',
+      cause: state.money <= 0 ? 'Your MONEY meter hit 0' : 'Your AGENCY meter hit 0',
       sceneId: 'ending-spectator',
       description: "Twenty-six weeks went by and I watched most of them. I stayed safe, stayed employed, stayed current on everyone else’s launches. The future got built — by other people — while I refreshed the feed and meant to start tomorrow. Tomorrow ran out."
     };
@@ -1132,6 +1070,7 @@ function getEnding() {
   return {
     isWin: false,
     title: 'Still a Spectator',
+    cause: `Time ran out — only ${state.appsShipped} of ${APPS_TO_SHIP} apps shipped`,
     sceneId: 'ending-spectator',
     description: `Twenty-six weeks gone, ${state.appsShipped} of ${APPS_TO_SHIP} credits shipped. I stayed safe, stayed busy, and watched the future get built by other people. I always meant to start tomorrow. Tomorrow ran out.`
   };
@@ -1423,7 +1362,6 @@ function getSpotlightScene(event, choice) {
   if (event.id === 'family_vacation') return 'family';
   if (event.id === 'laptop_drawing' || event.id === 'partner_question') return 'family';
   if (event.id === 'hacker_news' && choice.label.includes('NOW')) return 'late-night';
-  if (event.id && event.id.startsWith('project-complete') && choice._shipData) return 'ship';
   return null;
 }
 
